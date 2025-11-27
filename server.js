@@ -637,4 +637,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 });
 
+// DEBUG: Check token before login
+const token = process.env.DISCORD_BOT_TOKEN;
+console.log("---------------------------------------------------");
+console.log("DEBUG: Token check");
+if (!token) {
+    console.error("ERROR: DISCORD_BOT_TOKEN is missing in process.env");
+} else {
+    console.log(`Token found. Length: ${token.length}`);
+    console.log(`First 5 chars: '${token.substring(0, 5)}'`);
+    console.log(`Last 5 chars:  '${token.substring(token.length - 5)}'`);
+    if (token.includes(' ')) console.error("WARNING: Token contains spaces!");
+    if (token.includes('"')) console.error("WARNING: Token contains quotes!");
+}
+console.log("---------------------------------------------------");
+
 client.login(process.env.DISCORD_BOT_TOKEN);
