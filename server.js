@@ -117,8 +117,20 @@ app.get('/api/auth/callback', async (req, res) => {
         return res.status(400).send(`<h1>Authorization Error</h1><p>Discord returned an error: ${error}</p><p>${error_description}</p>`);
     }
 
-    if (!code || !state) {
-        return res.status(400).send(`<h1>Invalid Request</h1><p>Missing required parameters.</p><p>Code: ${code ? 'Present' : 'Missing'}</p><p>State: ${state ? 'Present' : 'Missing'}</p>`);
+    // TEMPORARY FIX: If state is missing, try to recover or bypass (NOT SECURE FOR PRODUCTION, DEBUG ONLY)
+    // In a real scenario, we MUST have state to know WHO verified.
+    // Let's try to see if we can get the user info from the token and match it?
+    // No, we need to know which Discord user initiated the request to link it to the bot's user ID.
+    
+    if (!code) {
+         return res.status(400).send(`<h1>Invalid Request</h1><p>Missing code parameter.</p>`);
+    }
+
+    // If state is missing, we can't proceed with the original logic because we don't know who to verify.
+    // However, for debugging, let's log this critical failure.
+    if (!state) {
+        console.error('CRITICAL: State parameter missing from callback URL. Discord did not return it.');
+        return res.status(400).send(`<h1>Verification Failed</h1><p>Discord did not return the required identification data (state).</p><p>Please try scanning the QR code again.</p>`);
     }
 
     try {
@@ -328,23 +340,9 @@ app.post('/api/verify/send-dm', async (req, res) => {
         const member = await guild.members.fetch(userId);
         if (!member) return res.status(404).json({ error: 'User not found' });
 
-        // Generate Fake OAuth2 Link (for simulation) or Real one
-        // Spec says: "Generates OAuth2 link... Creates QR... Sends DM"
-        const redirectUri = process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`;
-        const clientId = process.env.CLIENT_ID || client.user.id;
-        const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
-
-        // Generate QR
-        const qrCodeData = await QRCode.toDataURL(oauthUrl);
-        const buffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
-        const attachment = new AttachmentBuilder(buffer, { name: 'verification-qr.png' });
-
-        const embed = new EmbedBuilder()
-            .setTitle('Verification Required')
-            .setDescription('Please scan the QR code below to verify your account.')
-            .setColor('Blue');
-
-        await member.send({ embeds: [embed], files: [attachment] });
+        // Use the helper function to ensure consistency and include state
+        const messagePayload = await generateVerificationMessage(userId);
+        await member.send(messagePayload);
 
         res.json({ success: true, message: 'Verification DM sent' });
 
