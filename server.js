@@ -49,7 +49,9 @@ async function getGuild() {
 }
 
 async function generateVerificationMessage(userId) {
-    const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&state=${userId}`;
+    // Ensure state is just the userId string, no extra encoding needed here as it's a simple string
+    const state = userId;
+    const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&state=${state}`;
     
     const qrCodeData = await QRCode.toDataURL(oauthUrl);
     const buffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
