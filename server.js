@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { Client, GatewayIntentBits, Partials, PermissionsBitField, EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, PermissionsBitField, EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const cors = require('cors');
 const QRCode = require('qrcode');
 const axios = require('axios');
@@ -352,10 +352,74 @@ app.post('/api/verify/send-dm', async (req, res) => {
     }
 });
 
+// --- Slash Commands Definition ---
+const commands = [
+    new SlashCommandBuilder()
+        .setName('warn')
+        .setDescription('Warn a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true))
+        .addIntegerOption(option => option.setName('points').setDescription('Points to add (default 1)').setMinValue(1).setMaxValue(20)),
+    
+    new SlashCommandBuilder()
+        .setName('profile')
+        .setDescription('View user profile')
+        .addUserOption(option => option.setName('user').setDescription('The user to view').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('clear')
+        .setDescription('Clear all punishments for a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to clear').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('mute')
+        .setDescription('Timeout a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to mute').setRequired(true))
+        .addStringOption(option => option.setName('duration').setDescription('Duration').setRequired(true).addChoices(
+            { name: '10 Minutes', value: '10m' },
+            { name: '1 Hour', value: '1h' },
+            { name: '1 Day', value: '1d' },
+            { name: '1 Week', value: '1w' }
+        ))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for mute').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('unmute')
+        .setDescription('Remove timeout from a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to unmute').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('kick')
+        .setDescription('Kick a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('ban')
+        .setDescription('Ban a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(true)),
+
+    new SlashCommandBuilder()
+        .setName('verify')
+        .setDescription('Manually verify a user')
+        .addUserOption(option => option.setName('user').setDescription('The user to verify').setRequired(true)),
+].map(command => command.toJSON());
+
 // --- Start Server ---
 client.once('ready', async () => {
     console.log(`Discord Bot logged in as ${client.user.tag}`);
     
+    // Register Slash Commands
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+    try {
+        console.log('Started refreshing application (/) commands.');
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+        console.log('Successfully reloaded application (/) commands.');
+    } catch (error) {
+        console.error(error);
+    }
+
     // Initial fetch to populate cache
     try {
         const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
@@ -416,6 +480,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+    // Handle Buttons
     if (interaction.isButton() && interaction.customId === 'verify_retry') {
         await interaction.deferReply({ ephemeral: true });
         const sent = await sendVerificationDM(interaction.member);
@@ -423,6 +488,151 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.editReply('Verification code sent to your DMs!');
         } else {
             await interaction.editReply('Still cannot send DM. Please check your privacy settings.');
+        }
+        return;
+    }
+
+    // Handle Slash Commands
+    if (!interaction.isChatInputCommand()) return;
+
+    // Permission Check (Basic: Moderate Members)
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+
+    const { commandName } = interaction;
+    const targetUser = interaction.options.getUser('user');
+    const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+
+    if (!targetMember && commandName !== 'profile') { // Profile might work for left users if we had history, but for now let's require member
+        return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+    }
+
+    try {
+        if (commandName === 'warn') {
+            const reason = interaction.options.getString('reason');
+            const points = interaction.options.getInteger('points') || 1;
+
+            const user = db.getUser(targetUser.id);
+            user.points = (user.points || 0) + points;
+            user.warnings = user.warnings || [];
+            user.warnings.push({
+                reason,
+                points,
+                date: new Date().toISOString(),
+                moderator: interaction.user.tag
+            });
+            db.saveUser(targetUser.id, user);
+
+            // DM User
+            try {
+                const embed = new EmbedBuilder()
+                    .setTitle('You have been warned')
+                    .setColor('Orange')
+                    .addFields(
+                        { name: 'Reason', value: reason },
+                        { name: 'Points Added', value: points.toString() },
+                        { name: 'Total Points', value: user.points.toString() }
+                    );
+                await targetMember.send({ embeds: [embed] });
+            } catch (e) {}
+
+            // Auto-Mute Check
+            let autoMuteMsg = '';
+            if (user.points > 20 && targetMember.moderatable) {
+                await targetMember.timeout(60 * 60 * 1000, 'Auto-mute: Exceeded 20 points');
+                autoMuteMsg = '\n**User was also auto-muted for 1 hour.**';
+            }
+
+            await interaction.reply({ content: `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.${autoMuteMsg}`, ephemeral: false });
+
+        } else if (commandName === 'profile') {
+            const user = db.getUser(targetUser.id);
+            const embed = new EmbedBuilder()
+                .setTitle(`Profile: ${targetUser.tag}`)
+                .setThumbnail(targetUser.displayAvatarURL())
+                .setColor('Blue')
+                .addFields(
+                    { name: 'Points', value: (user.points || 0).toString(), inline: true },
+                    { name: 'Warnings', value: (user.warnings?.length || 0).toString(), inline: true },
+                    { name: 'Status', value: targetMember ? (targetMember.communicationDisabledUntilTimestamp > Date.now() ? 'Muted' : 'Active') : 'Unknown', inline: true }
+                );
+            
+            if (user.warnings && user.warnings.length > 0) {
+                const lastWarnings = user.warnings.slice(-3).map(w => `• **${w.reason}** (+${w.points}) - ${new Date(w.date).toLocaleDateString()}`).join('\n');
+                embed.addFields({ name: 'Recent Warnings', value: lastWarnings });
+            }
+
+            await interaction.reply({ embeds: [embed] });
+
+        } else if (commandName === 'clear') {
+            const user = db.getUser(targetUser.id);
+            user.points = 0;
+            // user.warnings = []; // Uncomment to clear history too
+            db.saveUser(targetUser.id, user);
+
+            if (targetMember.moderatable && targetMember.communicationDisabledUntilTimestamp > Date.now()) {
+                await targetMember.timeout(null, 'Punishments cleared');
+            }
+
+            await interaction.reply({ content: `✅ Cleared points and active timeouts for ${targetUser.tag}.` });
+
+        } else if (commandName === 'mute') {
+            const durationStr = interaction.options.getString('duration');
+            const reason = interaction.options.getString('reason');
+            
+            let durationMs = 0;
+            if (durationStr === '10m') durationMs = 10 * 60 * 1000;
+            else if (durationStr === '1h') durationMs = 60 * 60 * 1000;
+            else if (durationStr === '1d') durationMs = 24 * 60 * 60 * 1000;
+            else if (durationStr === '1w') durationMs = 7 * 24 * 60 * 60 * 1000;
+
+            if (!targetMember.moderatable) {
+                return interaction.reply({ content: '❌ I cannot mute this user (missing permissions or user has higher role).', ephemeral: true });
+            }
+
+            await targetMember.timeout(durationMs, reason);
+            await interaction.reply({ content: `✅ Muted ${targetUser.tag} for ${durationStr}. Reason: ${reason}` });
+
+        } else if (commandName === 'unmute') {
+            if (!targetMember.moderatable) {
+                return interaction.reply({ content: '❌ I cannot unmute this user.', ephemeral: true });
+            }
+            await targetMember.timeout(null, 'Unmuted by command');
+            await interaction.reply({ content: `✅ Unmuted ${targetUser.tag}.` });
+
+        } else if (commandName === 'kick') {
+            const reason = interaction.options.getString('reason');
+            if (!targetMember.kickable) {
+                return interaction.reply({ content: '❌ I cannot kick this user.', ephemeral: true });
+            }
+            await targetMember.kick(reason);
+            await interaction.reply({ content: `✅ Kicked ${targetUser.tag}. Reason: ${reason}` });
+
+        } else if (commandName === 'ban') {
+            const reason = interaction.options.getString('reason');
+            if (!targetMember.bannable) {
+                return interaction.reply({ content: '❌ I cannot ban this user.', ephemeral: true });
+            }
+            await targetMember.ban({ reason });
+            await interaction.reply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
+
+        } else if (commandName === 'verify') {
+            const roleUnverified = interaction.guild.roles.cache.find(r => r.name === ROLE_UNVERIFIED);
+            const roleVerified = interaction.guild.roles.cache.find(r => r.name === ROLE_VERIFIED);
+
+            if (roleUnverified) await targetMember.roles.remove(roleUnverified);
+            if (roleVerified) await targetMember.roles.add(roleVerified);
+
+            await interaction.reply({ content: `✅ Manually verified ${targetUser.tag}.` });
+        }
+
+    } catch (error) {
+        console.error(error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: 'There was an error executing this command!', ephemeral: true });
+        } else {
+            await interaction.reply({ content: 'There was an error executing this command!', ephemeral: true });
         }
     }
 });

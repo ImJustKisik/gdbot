@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User } from '../types';
-import { AlertTriangle, Trash2, Server, QrCode } from 'lucide-react';
+import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History } from 'lucide-react';
 import axios from 'axios';
 
 interface Props {
@@ -23,6 +23,10 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const [viewGuildsUser, setViewGuildsUser] = useState<User | null>(null);
   const [userGuilds, setUserGuilds] = useState<Guild[]>([]);
   const [loadingGuilds, setLoadingGuilds] = useState(false);
+
+  const [historyUser, setHistoryUser] = useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
 
   const handleWarn = async () => {
     if (!selectedUser) return;
@@ -75,6 +79,39 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
       }
   };
 
+  const handleSort = (key: 'username' | 'status' | 'points') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredAndSortedUsers = useMemo(() => {
+    let result = [...users];
+
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      result = result.filter(user => 
+        user.username.toLowerCase().includes(lowerTerm) || 
+        user.id.includes(lowerTerm)
+      );
+    }
+
+    if (sortConfig) {
+      result.sort((a, b) => {
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [users, searchTerm, sortConfig]);
+
   const getProgressColor = (points: number) => {
     if (points < 10) return 'bg-blue-500';
     if (points < 20) return 'bg-yellow-500';
@@ -83,18 +120,54 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Search Bar */}
+      <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+        <Search className="text-gray-400" size={20} />
+        <input 
+          type="text"
+          placeholder="Search users by name or ID..."
+          className="flex-1 outline-none text-gray-700"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="p-4 font-semibold text-gray-600">User</th>
-              <th className="p-4 font-semibold text-gray-600">Status</th>
-              <th className="p-4 font-semibold text-gray-600">Points (Max 20)</th>
+              <th 
+                className="p-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('username')}
+              >
+                <div className="flex items-center gap-2">
+                  User
+                  <ArrowUpDown size={14} />
+                </div>
+              </th>
+              <th 
+                className="p-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center gap-2">
+                  Status
+                  <ArrowUpDown size={14} />
+                </div>
+              </th>
+              <th 
+                className="p-4 font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={() => handleSort('points')}
+              >
+                <div className="flex items-center gap-2">
+                  Points (Max 20)
+                  <ArrowUpDown size={14} />
+                </div>
+              </th>
               <th className="p-4 font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map(user => (
+            {filteredAndSortedUsers.map(user => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4 flex items-center gap-3">
                   <img src={user.avatar} alt="" className="w-10 h-10 rounded-full" />
@@ -128,6 +201,13 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                       <Server size={18} />
                     </button>
                     <button 
+                      onClick={() => setHistoryUser(user)}
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="View History"
+                    >
+                      <History size={18} />
+                    </button>
+                    <button 
                       onClick={() => handleSendVerification(user.id)}
                       className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                       title="Send Verification QR"
@@ -152,6 +232,13 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                 </td>
               </tr>
             ))}
+            {filteredAndSortedUsers.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-gray-500">
+                  No users found matching "{searchTerm}"
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -199,6 +286,37 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                 Send Warning
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {historyUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold">Warning History: {historyUser.username}</h3>
+              <button onClick={() => setHistoryUser(null)} className="text-gray-500 hover:text-gray-700">Close</button>
+            </div>
+
+            {historyUser.warnings.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No warnings recorded for this user.</p>
+            ) : (
+              <div className="space-y-4">
+                {historyUser.warnings.map((warning, idx) => (
+                  <div key={idx} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-semibold text-gray-900">{warning.reason}</span>
+                      <span className="text-xs text-gray-500">{new Date(warning.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Points: <span className="font-medium text-orange-600">+{warning.points}</span></span>
+                      <span className="text-gray-500">By: {warning.moderator || 'System'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
