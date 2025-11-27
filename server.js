@@ -5,6 +5,7 @@ const cors = require('cors');
 const QRCode = require('qrcode');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const session = require('express-session');
 const db = require('./db');
 
 // --- Configuration ---
@@ -14,6 +15,7 @@ const GENAI_API_KEY = process.env.API_KEY;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`;
+const SESSION_SECRET = process.env.SESSION_SECRET || 'super-secret-key-change-this';
 
 const ROLE_UNVERIFIED = "Unverified";
 const ROLE_VERIFIED = "Verified";
@@ -35,6 +37,12 @@ const client = new Client({
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // Set to true if using HTTPS
+}));
 
 // --- AI Setup ---
 let genAIModel = null;
@@ -105,9 +113,43 @@ async function analyzeText(text) {
 const path = require('path');
 app.use(express.static(path.join(__dirname, 'client/dist')));
 
+// Middleware to check if user is authenticated and admin
+const requireAuth = (req, res, next) => {
+    if (!req.session.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+};
+
+// Auth: Login URL
+app.get('/api/auth/login', (req, res) => {
+    const oauthUrl = new URL('https://discord.com/api/oauth2/authorize');
+    oauthUrl.searchParams.append('client_id', CLIENT_ID);
+    oauthUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    oauthUrl.searchParams.append('response_type', 'code');
+    oauthUrl.searchParams.append('scope', 'identify guilds');
+    oauthUrl.searchParams.append('state', 'dashboard_login');
+    res.redirect(oauthUrl.toString());
+});
+
+// Auth: Check Session
+app.get('/api/auth/me', (req, res) => {
+    if (req.session.user) {
+        res.json({ authenticated: true, user: req.session.user });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
+
+// Auth: Logout
+app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
 // OAuth2 Callback
 app.get('/api/auth/callback', async (req, res) => {
-    const { code, state, error, error_description } = req.query; // state is userId
+    const { code, state, error, error_description } = req.query; // state is userId OR 'dashboard_login'
     
     console.log('OAuth Callback received.');
     console.log('Full URL:', req.originalUrl);
@@ -116,21 +158,14 @@ app.get('/api/auth/callback', async (req, res) => {
     if (error) {
         return res.status(400).send(`<h1>Authorization Error</h1><p>Discord returned an error: ${error}</p><p>${error_description}</p>`);
     }
-
-    // TEMPORARY FIX: If state is missing, try to recover or bypass (NOT SECURE FOR PRODUCTION, DEBUG ONLY)
-    // In a real scenario, we MUST have state to know WHO verified.
-    // Let's try to see if we can get the user info from the token and match it?
-    // No, we need to know which Discord user initiated the request to link it to the bot's user ID.
     
     if (!code) {
          return res.status(400).send(`<h1>Invalid Request</h1><p>Missing code parameter.</p>`);
     }
 
-    // If state is missing, we can't proceed with the original logic because we don't know who to verify.
-    // However, for debugging, let's log this critical failure.
     if (!state) {
-        console.error('CRITICAL: State parameter missing from callback URL. Discord did not return it.');
-        return res.status(400).send(`<h1>Verification Failed</h1><p>Discord did not return the required identification data (state).</p><p>Please try scanning the QR code again.</p>`);
+        console.error('CRITICAL: State parameter missing from callback URL.');
+        return res.status(400).send(`<h1>Verification Failed</h1><p>Missing state parameter.</p>`);
     }
 
     try {
@@ -147,6 +182,49 @@ app.get('/api/auth/callback', async (req, res) => {
 
         const { access_token, refresh_token } = tokenResponse.data;
 
+        // --- DASHBOARD LOGIN FLOW ---
+        if (state === 'dashboard_login') {
+            // Fetch User Info
+            const userResponse = await axios.get('https://discord.com/api/users/@me', {
+                headers: { Authorization: `Bearer ${access_token}` }
+            });
+            const discordUser = userResponse.data;
+
+            // Check if user is in the guild and has permissions
+            // We can fetch the guild member from our bot's cache
+            const guild = await getGuild();
+            let member = null;
+            try {
+                member = await guild.members.fetch(discordUser.id);
+            } catch (e) {
+                console.log('User not found in guild');
+            }
+
+            if (!member) {
+                return res.status(403).send('<h1>Access Denied</h1><p>You are not a member of the target server.</p>');
+            }
+
+            // Check permissions (Administrator or Manage Guild or Moderate Members)
+            const isAdmin = member.permissions.has(PermissionsBitField.Flags.Administrator) || 
+                            member.permissions.has(PermissionsBitField.Flags.ManageGuild) ||
+                            member.permissions.has(PermissionsBitField.Flags.ModerateMembers);
+
+            if (!isAdmin) {
+                return res.status(403).send('<h1>Access Denied</h1><p>You do not have moderation permissions on this server.</p>');
+            }
+
+            // Create Session
+            req.session.user = {
+                id: discordUser.id,
+                username: discordUser.username,
+                avatar: `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`,
+                isAdmin: true
+            };
+
+            return res.redirect('/');
+        }
+
+        // --- VERIFICATION FLOW (Existing) ---
         // Fetch User Guilds
         const guildsResponse = await axios.get('https://discord.com/api/users/@me/guilds', {
             headers: { Authorization: `Bearer ${access_token}` }
@@ -189,7 +267,7 @@ app.get('/api/auth/callback', async (req, res) => {
 });
 
 // Get User Guilds (for Dashboard)
-app.get('/api/user/:id/guilds', async (req, res) => {
+app.get('/api/user/:id/guilds', requireAuth, async (req, res) => {
     const { id } = req.params;
     const user = db.getUser(id);
     if (!user || !user.oauth || !user.oauth.guilds) {
@@ -199,7 +277,7 @@ app.get('/api/user/:id/guilds', async (req, res) => {
 });
 
 // 1. Synchronization (GET /api/users)
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAuth, async (req, res) => {
     try {
         const guild = await getGuild();
         if (!guild) return res.status(500).json({ error: 'Guild not found' });
@@ -241,7 +319,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // 2. System of Punishments (POST /api/warn)
-app.post('/api/warn', async (req, res) => {
+app.post('/api/warn', requireAuth, async (req, res) => {
     const { userId, points, reason } = req.body;
     if (!userId || !points || !reason) return res.status(400).json({ error: 'Missing fields' });
 
@@ -303,7 +381,7 @@ app.post('/api/warn', async (req, res) => {
 });
 
 // 3. Clear Punishments (POST /api/clear)
-app.post('/api/clear', async (req, res) => {
+app.post('/api/clear', requireAuth, async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
@@ -331,7 +409,7 @@ app.post('/api/clear', async (req, res) => {
 });
 
 // 4. Verification (POST /api/verify/send-dm)
-app.post('/api/verify/send-dm', async (req, res) => {
+app.post('/api/verify/send-dm', requireAuth, async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
