@@ -49,20 +49,26 @@ async function getGuild() {
 }
 
 async function generateVerificationMessage(userId) {
-    // Ensure state is just the userId string
-    const state = userId;
-    const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&state=${encodeURIComponent(state)}`;
+    // Use URL object to safely construct the URL
+    const oauthUrl = new URL('https://discord.com/api/oauth2/authorize');
+    oauthUrl.searchParams.append('client_id', CLIENT_ID);
+    oauthUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    oauthUrl.searchParams.append('response_type', 'code');
+    oauthUrl.searchParams.append('scope', 'identify guilds');
+    oauthUrl.searchParams.append('state', userId);
     
-    console.log(`Generated OAuth URL for user ${userId}: ${oauthUrl}`); // Log the URL
+    const finalUrl = oauthUrl.toString();
+    
+    console.log(`Generated OAuth URL for user ${userId}: ${finalUrl}`);
 
-    const qrCodeData = await QRCode.toDataURL(oauthUrl);
+    const qrCodeData = await QRCode.toDataURL(finalUrl);
     const buffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
     const attachment = new AttachmentBuilder(buffer, { name: 'verification-qr.png' });
 
     const embed = new EmbedBuilder()
         .setTitle('Verification Required')
         .setDescription('Welcome! Please scan the QR code below using your **phone camera** (do NOT use the Discord app scanner) or click the link to verify.')
-        .addFields({ name: 'Verification Link', value: `[Click here to verify](${oauthUrl})` })
+        .addFields({ name: 'Verification Link', value: `[Click here to verify](${finalUrl})` })
         .setColor('Blue')
         .setImage('attachment://verification-qr.png');
 
@@ -103,7 +109,9 @@ app.use(express.static(path.join(__dirname, 'client/dist')));
 app.get('/api/auth/callback', async (req, res) => {
     const { code, state, error, error_description } = req.query; // state is userId
     
-    console.log('OAuth Callback received. Query:', req.query);
+    console.log('OAuth Callback received.');
+    console.log('Full URL:', req.originalUrl);
+    console.log('Query Params:', req.query);
 
     if (error) {
         return res.status(400).send(`<h1>Authorization Error</h1><p>Discord returned an error: ${error}</p><p>${error_description}</p>`);
