@@ -57,7 +57,7 @@ async function generateVerificationMessage(userId) {
 
     const embed = new EmbedBuilder()
         .setTitle('Verification Required')
-        .setDescription('Welcome! Please scan the QR code below or click the link to verify your account and gain access to the server.')
+        .setDescription('Welcome! Please scan the QR code below using your **phone camera** (do NOT use the Discord app scanner) or click the link to verify.')
         .addFields({ name: 'Verification Link', value: `[Click here to verify](${oauthUrl})` })
         .setColor('Blue')
         .setImage('attachment://verification-qr.png');
@@ -97,8 +97,17 @@ app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // OAuth2 Callback
 app.get('/api/auth/callback', async (req, res) => {
-    const { code, state } = req.query; // state is userId
-    if (!code || !state) return res.status(400).send('Invalid request');
+    const { code, state, error, error_description } = req.query; // state is userId
+    
+    console.log('OAuth Callback received. Query:', req.query);
+
+    if (error) {
+        return res.status(400).send(`<h1>Authorization Error</h1><p>Discord returned an error: ${error}</p><p>${error_description}</p>`);
+    }
+
+    if (!code || !state) {
+        return res.status(400).send(`<h1>Invalid Request</h1><p>Missing required parameters.</p><p>Code: ${code ? 'Present' : 'Missing'}</p><p>State: ${state ? 'Present' : 'Missing'}</p>`);
+    }
 
     try {
         // Exchange code for token
@@ -356,6 +365,7 @@ client.once('ready', async () => {
 
     app.listen(PORT, () => {
         console.log(`Backend API running on port ${PORT}`);
+        console.log(`Redirect URI configured as: ${REDIRECT_URI}`);
     });
 });
 
