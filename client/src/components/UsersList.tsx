@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User } from '../types';
 import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History } from 'lucide-react';
 import axios from 'axios';
@@ -27,6 +27,14 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const [historyUser, setHistoryUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
+  
+  const [presets, setPresets] = useState<{id: number, name: string, points: number}[]>([]);
+
+  useEffect(() => {
+    if (selectedUser) {
+        axios.get('/api/presets').then(res => setPresets(res.data)).catch(console.error);
+    }
+  }, [selectedUser]);
 
   const handleWarn = async () => {
     if (!selectedUser) return;
@@ -249,6 +257,26 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
             <h3 className="text-xl font-bold mb-4">Warn {selectedUser.username}</h3>
             
+            {presets.length > 0 && (
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Presets</label>
+                    <div className="flex flex-wrap gap-2">
+                        {presets.map(preset => (
+                            <button
+                                key={preset.id}
+                                onClick={() => {
+                                    setWarnReason(preset.name);
+                                    setWarnPoints(preset.points);
+                                }}
+                                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors"
+                            >
+                                {preset.name} ({preset.points})
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
               <input 

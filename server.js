@@ -373,6 +373,51 @@ app.post('/api/settings', requireAuth, (req, res) => {
     res.json({ success: true });
 });
 
+// --- Roles API ---
+app.get('/api/roles', requireAuth, async (req, res) => {
+    try {
+        const guild = await getGuild();
+        const roles = guild.roles.cache
+            .filter(r => r.name !== '@everyone')
+            .map(r => ({ id: r.id, name: r.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        res.json(roles);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch roles' });
+    }
+});
+
+// --- Presets API ---
+app.get('/api/presets', requireAuth, (req, res) => {
+    try {
+        const presets = db.getPresets();
+        res.json(presets);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch presets' });
+    }
+});
+
+app.post('/api/presets', requireAuth, (req, res) => {
+    const { name, points } = req.body;
+    if (!name || !points) return res.status(400).json({ error: 'Missing fields' });
+    try {
+        db.addPreset(name, points);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add preset' });
+    }
+});
+
+app.delete('/api/presets/:id', requireAuth, (req, res) => {
+    try {
+        db.deletePreset(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete preset' });
+    }
+});
+
 // 2. System of Punishments (POST /api/warn)
 app.post('/api/warn', requireAuth, async (req, res) => {
     const { userId, points, reason } = req.body;

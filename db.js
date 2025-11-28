@@ -17,6 +17,11 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+  CREATE TABLE IF NOT EXISTS presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    points INTEGER
+  );
 `);
 
 // Migration function
@@ -83,5 +88,15 @@ module.exports = {
             settings[row.key] = JSON.parse(row.value);
         }
         return settings;
+    },
+    // Presets
+    getPresets: () => {
+        return db.prepare('SELECT * FROM presets').all();
+    },
+    addPreset: (name, points) => {
+        return db.prepare('INSERT INTO presets (name, points) VALUES (?, ?)').run(name, points);
+    },
+    deletePreset: (id) => {
+        db.prepare('DELETE FROM presets WHERE id = ?').run(id);
     }
 };
