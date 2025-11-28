@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X } from 'lucide-react';
 import { DashboardStats } from './components/DashboardStats';
+import { AnalyticsView } from './components/AnalyticsView';
 import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
@@ -221,6 +222,8 @@ function App() {
             
             <DashboardStats users={users} />
             
+            <AnalyticsView />
+
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Member Management</h3>
               <UsersList users={users} refresh={fetchUsers} />
