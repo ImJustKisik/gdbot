@@ -6,6 +6,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { User } from './types';
 
 interface AuthUser {
@@ -50,8 +51,13 @@ function App() {
     if (!isAuthenticated) return;
     try {
       const res = await axios.get('/api/users');
-      setUsers(res.data);
-      setError(null);
+      if (Array.isArray(res.data)) {
+        setUsers(res.data);
+        setError(null);
+      } else {
+        console.error('Invalid users data:', res.data);
+        setUsers([]);
+      }
     } catch (err) {
       console.error(err);
       if (loading) setError('Failed to connect to server. Please ensure the bot is running.');
@@ -222,7 +228,9 @@ function App() {
             
             <DashboardStats users={users} />
             
-            <AnalyticsView />
+            <ErrorBoundary>
+              <AnalyticsView />
+            </ErrorBoundary>
 
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Member Management</h3>

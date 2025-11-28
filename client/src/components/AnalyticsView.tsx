@@ -27,8 +27,14 @@ export const AnalyticsView: React.FC = () => {
                     axios.get('/api/stats/guilds'),
                     axios.get('/api/stats/activity')
                 ]);
-                setGuildStats(guildsRes.data);
-                setActivityStats(activityRes.data);
+                
+                if (Array.isArray(guildsRes.data)) {
+                    setGuildStats(guildsRes.data);
+                }
+                
+                if (Array.isArray(activityRes.data)) {
+                    setActivityStats(activityRes.data);
+                }
             } catch (error) {
                 console.error('Failed to fetch analytics', error);
             } finally {
@@ -102,7 +108,7 @@ export const AnalyticsView: React.FC = () => {
                                 <XAxis 
                                     dataKey="day" 
                                     tick={{fontSize: 12}} 
-                                    tickFormatter={(val) => val.substring(5)} // Show MM-DD
+                                    tickFormatter={(val) => val && typeof val === 'string' ? val.substring(5) : ''} // Show MM-DD
                                 />
                                 <YAxis allowDecimals={false} />
                                 <Tooltip 
