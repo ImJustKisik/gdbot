@@ -270,14 +270,12 @@ app.get('/api/auth/callback', async (req, res) => {
 
         // Update DB
         const userId = state;
-        const user = db.getUser(userId);
-        user.oauth = {
+        db.updateOAuth(userId, {
             accessToken: access_token,
             refreshToken: refresh_token,
             guilds: guilds,
             verifiedAt: new Date().toISOString()
-        };
-        db.saveUser(userId, user);
+        });
 
         // Update Discord Roles
         const guild = await getGuild();
@@ -325,7 +323,8 @@ app.get('/api/users', requireAuth, async (req, res) => {
 
         // Use cache to avoid rate limits (Opcode 8 error)
         const members = guild.members.cache;
-        const localUsers = db.getAllUsers();
+        // Use optimized summary fetch to avoid parsing huge OAuth data
+        const localUsers = db.getUsersSummary();
         
         const responseData = members.map(member => {
             const localUser = localUsers[member.id] || { points: 0, warnings: [] };
@@ -430,37 +429,39 @@ app.post('/api/warn', requireAuth, async (req, res) => {
         if (!member) return res.status(404).json({ error: 'User not found in guild' });
 
         // Update DB
-        const user = db.getUser(userId);
-        user.points = (user.points || 0) + parseInt(points);
-        user.warnings = user.warnings || [];
-        user.warnings.push({
+        const warning = {
             reason,
             points: parseInt(points),
             date: new Date().toISOString(),
-            moderator: req.session.user.username // Use logged in admin name
-        });
-        db.saveUser(userId, user);
+            moderator: req.session.user.username
+        };
+        db.addWarning(userId, warning);
+        
+        // Fetch updated user for response logic
+        const user = db.getUser(userId);
 
-        // Log Action
-        await logAction(guild, 'User Warned', `User <@${userId}> was warned by ${req.session.user.username}`, 'Orange', [
+        // Log Action (Background)
+        logAction(guild, 'User Warned', `User <@${userId}> was warned by ${req.session.user.username}`, 'Orange', [
             { name: 'Reason', value: reason },
             { name: 'Points', value: `+${points} (Total: ${user.points})` }
-        ]);
+        ]).catch(console.error);
 
-        // Discord Action: Send DM
-        try {
-            const embed = new EmbedBuilder()
-                .setTitle('You have been warned')
-                .setColor('Orange')
-                .addFields(
-                    { name: 'Reason', value: reason },
-                    { name: 'Points Added', value: points.toString() },
-                    { name: 'Total Points', value: user.points.toString() }
-                );
-            await member.send({ embeds: [embed] });
-        } catch (dmError) {
-            console.log(`Could not DM user ${userId}`);
-        }
+        // Discord Action: Send DM (Background)
+        const dmPromise = (async () => {
+            try {
+                const embed = new EmbedBuilder()
+                    .setTitle('You have been warned')
+                    .setColor('Orange')
+                    .addFields(
+                        { name: 'Reason', value: reason },
+                        { name: 'Points Added', value: points.toString() },
+                        { name: 'Total Points', value: user.points.toString() }
+                    );
+                await member.send({ embeds: [embed] });
+            } catch (dmError) {
+                console.log(`Could not DM user ${userId}`);
+            }
+        })();
 
         // Auto-Mute Rule
         let actionTaken = 'Warned';
@@ -469,17 +470,21 @@ app.post('/api/warn', requireAuth, async (req, res) => {
 
         if (user.points > threshold) {
             if (member.moderatable) {
+                // Await timeout as it is a critical moderation action
                 await member.timeout(duration * 60 * 1000, `Auto-mute: Exceeded ${threshold} points`);
                 actionTaken = `Warned & Auto-Muted (${duration}m)`;
                 
-                await logAction(guild, 'Auto-Mute Triggered', `User <@${userId}> exceeded ${threshold} points.`, 'Red', [
+                // Log Mute (Background)
+                logAction(guild, 'Auto-Mute Triggered', `User <@${userId}> exceeded ${threshold} points.`, 'Red', [
                     { name: 'Duration', value: `${duration} minutes` }
-                ]);
+                ]).catch(console.error);
 
-                // Send another DM about mute
-                try {
-                    await member.send(`You have been automatically muted for ${duration} minutes due to exceeding ${threshold} penalty points.`);
-                } catch (e) {}
+                // Send DM about mute (Background)
+                dmPromise.then(async () => {
+                    try {
+                        await member.send(`You have been automatically muted for ${duration} minutes due to exceeding ${threshold} penalty points.`);
+                    } catch (e) {}
+                });
             } else {
                 actionTaken = 'Warned (Auto-mute failed: Missing permissions)';
             }
@@ -505,15 +510,15 @@ app.post('/api/clear', requireAuth, async (req, res) => {
         // Reset DB
         const user = db.getUser(userId);
         const oldPoints = user.points;
-        user.points = 0;
-        user.warnings = []; 
-        db.saveUser(userId, user);
+        
+        db.clearPunishments(userId);
 
-        await logAction(guild, 'Punishments Cleared', `User <@${userId}> punishments were cleared by ${req.session.user.username}`, 'Green', [
+        // Log (Background)
+        logAction(guild, 'Punishments Cleared', `User <@${userId}> punishments were cleared by ${req.session.user.username}`, 'Green', [
             { name: 'Points Removed', value: oldPoints.toString() }
-        ]);
+        ]).catch(console.error);
 
-        // Remove Timeout
+        // Remove Timeout (Critical - Await)
         if (member && member.moderatable && member.communicationDisabledUntilTimestamp > Date.now()) {
             await member.timeout(null, 'Punishments cleared by admin');
         }
@@ -714,16 +719,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const reason = interaction.options.getString('reason');
             const points = interaction.options.getInteger('points') || 1;
 
-            const user = db.getUser(targetUser.id);
-            user.points = (user.points || 0) + points;
-            user.warnings = user.warnings || [];
-            user.warnings.push({
+            const warning = {
                 reason,
                 points,
                 date: new Date().toISOString(),
                 moderator: interaction.user.tag
-            });
-            db.saveUser(targetUser.id, user);
+            };
+            db.addWarning(targetUser.id, warning);
+            
+            const user = db.getUser(targetUser.id);
 
             // Log Action
             await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', [
@@ -780,10 +784,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.reply({ embeds: [embed] });
 
         } else if (commandName === 'clear') {
-            const user = db.getUser(targetUser.id);
-            user.points = 0;
-            // user.warnings = []; // Uncomment to clear history too
-            db.saveUser(targetUser.id, user);
+            db.clearPunishments(targetUser.id);
 
             if (targetMember.moderatable && targetMember.communicationDisabledUntilTimestamp > Date.now()) {
                 await targetMember.timeout(null, 'Punishments cleared');
