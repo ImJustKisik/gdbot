@@ -12,7 +12,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     data TEXT
-  )
+  );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 // Migration function
@@ -64,5 +68,20 @@ module.exports = {
             users[row.id] = JSON.parse(row.data);
         }
         return users;
+    },
+    getSetting: (key) => {
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+        return row ? JSON.parse(row.value) : null;
+    },
+    setSetting: (key, value) => {
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, JSON.stringify(value));
+    },
+    getAllSettings: () => {
+        const rows = db.prepare('SELECT key, value FROM settings').all();
+        const settings = {};
+        for (const row of rows) {
+            settings[row.key] = JSON.parse(row.value);
+        }
+        return settings;
     }
 };

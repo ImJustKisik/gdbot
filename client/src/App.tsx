@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings } from 'lucide-react';
 import { DashboardStats } from './components/DashboardStats';
 import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
+import { SettingsView } from './components/SettingsView';
 import { User } from './types';
 
 interface AuthUser {
@@ -14,7 +15,7 @@ interface AuthUser {
 }
 
 function App() {
-  const [view, setView] = useState<'dashboard' | 'verification'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'verification' | 'settings'>('dashboard');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +164,15 @@ function App() {
             <ShieldCheck size={20} />
             Verification
           </button>
+          <button 
+            onClick={() => setView('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              view === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Settings size={20} />
+            Settings
+          </button>
         </nav>
 
         <div className="p-4 border-t border-gray-100">
@@ -199,8 +209,10 @@ function App() {
               <UsersList users={users} refresh={fetchUsers} />
             </div>
           </>
-        ) : (
+        ) : view === 'verification' ? (
           <VerificationView />
+        ) : (
+          <SettingsView />
         )}
       </main>
     </div>

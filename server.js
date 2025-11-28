@@ -21,6 +21,42 @@ const ROLE_UNVERIFIED = "Unverified";
 const ROLE_VERIFIED = "Verified";
 const VERIFICATION_CHANNEL_NAME = "verification"; // Channel to post if DM fails
 
+// --- Settings Management ---
+const DEFAULT_SETTINGS = {
+    logChannelId: "",
+    verificationChannelId: "",
+    autoMuteThreshold: 20,
+    autoMuteDuration: 60, // minutes
+    roleUnverified: "Unverified",
+    roleVerified: "Verified"
+};
+
+function getAppSetting(key) {
+    const val = db.getSetting(key);
+    return val !== null ? val : DEFAULT_SETTINGS[key];
+}
+
+async function logAction(guild, title, description, color = 'Blue', fields = []) {
+    const logChannelId = getAppSetting('logChannelId');
+    if (!logChannelId) return;
+
+    const channel = guild.channels.cache.get(logChannelId);
+    if (!channel) return;
+
+    const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(color)
+        .addFields(fields)
+        .setTimestamp();
+
+    try {
+        await channel.send({ embeds: [embed] });
+    } catch (e) {
+        console.error('Failed to send log:', e);
+    }
+}
+
 // --- Discord Client Setup ---
 const client = new Client({
     intents: [
@@ -247,12 +283,17 @@ app.get('/api/auth/callback', async (req, res) => {
         const guild = await getGuild();
         const member = await guild.members.fetch(userId);
         if (member) {
-            const roleUnverified = guild.roles.cache.find(r => r.name === ROLE_UNVERIFIED);
-            const roleVerified = guild.roles.cache.find(r => r.name === ROLE_VERIFIED);
+            const unverifiedRoleName = getAppSetting('roleUnverified');
+            const verifiedRoleName = getAppSetting('roleVerified');
+            
+            const roleUnverified = guild.roles.cache.find(r => r.name === unverifiedRoleName);
+            const roleVerified = guild.roles.cache.find(r => r.name === verifiedRoleName);
 
             if (roleUnverified) await member.roles.remove(roleUnverified);
             if (roleVerified) await member.roles.add(roleVerified);
             
+            await logAction(guild, 'User Verified', `User <@${userId}> verified successfully via QR/OAuth.`, 'Green');
+
             try {
                 await member.send("Verification successful! You now have access to the server.");
             } catch (e) {}
@@ -318,6 +359,20 @@ app.get('/api/users', requireAuth, async (req, res) => {
     }
 });
 
+// --- Settings API ---
+app.get('/api/settings', requireAuth, (req, res) => {
+    const settings = db.getAllSettings();
+    res.json({ ...DEFAULT_SETTINGS, ...settings });
+});
+
+app.post('/api/settings', requireAuth, (req, res) => {
+    const newSettings = req.body;
+    for (const [key, value] of Object.entries(newSettings)) {
+        db.setSetting(key, value);
+    }
+    res.json({ success: true });
+});
+
 // 2. System of Punishments (POST /api/warn)
 app.post('/api/warn', requireAuth, async (req, res) => {
     const { userId, points, reason } = req.body;
@@ -337,9 +392,15 @@ app.post('/api/warn', requireAuth, async (req, res) => {
             reason,
             points: parseInt(points),
             date: new Date().toISOString(),
-            moderator: 'WebAdmin' // Simplified for now
+            moderator: req.session.user.username // Use logged in admin name
         });
         db.saveUser(userId, user);
+
+        // Log Action
+        await logAction(guild, 'User Warned', `User <@${userId}> was warned by ${req.session.user.username}`, 'Orange', [
+            { name: 'Reason', value: reason },
+            { name: 'Points', value: `+${points} (Total: ${user.points})` }
+        ]);
 
         // Discord Action: Send DM
         try {
@@ -358,14 +419,21 @@ app.post('/api/warn', requireAuth, async (req, res) => {
 
         // Auto-Mute Rule
         let actionTaken = 'Warned';
-        if (user.points > 20) {
+        const threshold = getAppSetting('autoMuteThreshold');
+        const duration = getAppSetting('autoMuteDuration');
+
+        if (user.points > threshold) {
             if (member.moderatable) {
-                await member.timeout(60 * 60 * 1000, 'Auto-mute: Exceeded 20 points'); // 1 hour
-                actionTaken = 'Warned & Auto-Muted (1h)';
+                await member.timeout(duration * 60 * 1000, `Auto-mute: Exceeded ${threshold} points`);
+                actionTaken = `Warned & Auto-Muted (${duration}m)`;
                 
+                await logAction(guild, 'Auto-Mute Triggered', `User <@${userId}> exceeded ${threshold} points.`, 'Red', [
+                    { name: 'Duration', value: `${duration} minutes` }
+                ]);
+
                 // Send another DM about mute
                 try {
-                    await member.send("You have been automatically muted for 1 hour due to exceeding 20 penalty points.");
+                    await member.send(`You have been automatically muted for ${duration} minutes due to exceeding ${threshold} penalty points.`);
                 } catch (e) {}
             } else {
                 actionTaken = 'Warned (Auto-mute failed: Missing permissions)';
@@ -391,9 +459,14 @@ app.post('/api/clear', requireAuth, async (req, res) => {
 
         // Reset DB
         const user = db.getUser(userId);
+        const oldPoints = user.points;
         user.points = 0;
-        user.warnings = []; // Optional: clear history too? Spec says "Obnulyayet bally", implies reset.
+        user.warnings = []; 
         db.saveUser(userId, user);
+
+        await logAction(guild, 'Punishments Cleared', `User <@${userId}> punishments were cleared by ${req.session.user.username}`, 'Green', [
+            { name: 'Points Removed', value: oldPoints.toString() }
+        ]);
 
         // Remove Timeout
         if (member && member.moderatable && member.communicationDisabledUntilTimestamp > Date.now()) {
@@ -528,11 +601,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
     console.log(`New member joined: ${member.user.tag}`);
 
     // Add Unverified Role
-    const roleUnverified = member.guild.roles.cache.find(r => r.name === ROLE_UNVERIFIED);
+    const roleName = getAppSetting('roleUnverified');
+    const roleUnverified = member.guild.roles.cache.find(r => r.name === roleName);
     if (roleUnverified) {
         await member.roles.add(roleUnverified);
     } else {
-        console.warn(`Role "${ROLE_UNVERIFIED}" not found.`);
+        console.warn(`Role "${roleName}" not found.`);
     }
 
     // Send DM
@@ -540,7 +614,11 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
     if (!sent) {
         // Send to channel if DM failed
-        const channel = member.guild.channels.cache.find(c => c.name === VERIFICATION_CHANNEL_NAME) || member.guild.systemChannel;
+        const channelId = getAppSetting('verificationChannelId');
+        let channel = null;
+        if (channelId) channel = member.guild.channels.cache.get(channelId);
+        if (!channel) channel = member.guild.channels.cache.find(c => c.name === VERIFICATION_CHANNEL_NAME) || member.guild.systemChannel;
+        
         if (channel) {
             const retryButton = new ButtonBuilder()
                 .setCustomId('verify_retry')
