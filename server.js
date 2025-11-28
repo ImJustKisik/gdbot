@@ -680,6 +680,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
             });
             db.saveUser(targetUser.id, user);
 
+            // Log Action
+            await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', [
+                { name: 'Reason', value: reason },
+                { name: 'Points', value: `+${points} (Total: ${user.points})` }
+            ]);
+
             // DM User
             try {
                 const embed = new EmbedBuilder()
@@ -695,9 +701,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             // Auto-Mute Check
             let autoMuteMsg = '';
-            if (user.points > 20 && targetMember.moderatable) {
-                await targetMember.timeout(60 * 60 * 1000, 'Auto-mute: Exceeded 20 points');
-                autoMuteMsg = '\n**User was also auto-muted for 1 hour.**';
+            const threshold = getAppSetting('autoMuteThreshold');
+            const duration = getAppSetting('autoMuteDuration');
+
+            if (user.points > threshold && targetMember.moderatable) {
+                await targetMember.timeout(duration * 60 * 1000, `Auto-mute: Exceeded ${threshold} points`);
+                autoMuteMsg = `\n**User was also auto-muted for ${duration} minutes.**`;
+                
+                await logAction(interaction.guild, 'Auto-Mute Triggered', `User <@${targetUser.id}> exceeded ${threshold} points.`, 'Red', [
+                    { name: 'Duration', value: `${duration} minutes` }
+                ]);
             }
 
             await interaction.reply({ content: `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.${autoMuteMsg}`, ephemeral: false });
@@ -774,11 +787,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.reply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
 
         } else if (commandName === 'verify') {
-            const roleUnverified = interaction.guild.roles.cache.find(r => r.name === ROLE_UNVERIFIED);
-            const roleVerified = interaction.guild.roles.cache.find(r => r.name === ROLE_VERIFIED);
+            const unverifiedRoleName = getAppSetting('roleUnverified');
+            const verifiedRoleName = getAppSetting('roleVerified');
+            
+            const roleUnverified = interaction.guild.roles.cache.find(r => r.name === unverifiedRoleName);
+            const roleVerified = interaction.guild.roles.cache.find(r => r.name === verifiedRoleName);
 
             if (roleUnverified) await targetMember.roles.remove(roleUnverified);
             if (roleVerified) await targetMember.roles.add(roleVerified);
+
+            await logAction(interaction.guild, 'User Verified (Command)', `User <@${targetUser.id}> was manually verified by ${interaction.user.tag}.`, 'Green');
 
             await interaction.reply({ content: `✅ Manually verified ${targetUser.tag}.` });
         }

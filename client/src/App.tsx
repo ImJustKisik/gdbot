@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X } from 'lucide-react';
 import { DashboardStats } from './components/DashboardStats';
 import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
@@ -23,6 +23,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Check Auth Status
   useEffect(() => {
@@ -126,13 +127,27 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden" 
+          onClick={() => setIsMobileMenuOpen(false)} 
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
-        <div className="p-6 border-b border-gray-100">
+      <aside className={`
+        fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:flex flex-col
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <ShieldCheck className="text-blue-600" />
             Discord Guardian
           </h1>
+          <button className="md:hidden text-gray-500" onClick={() => setIsMobileMenuOpen(false)}>
+            <X size={24} />
+          </button>
         </div>
         
         <div className="p-4">
@@ -147,7 +162,7 @@ function App() {
 
         <nav className="px-4 space-y-2 flex-1">
           <button 
-            onClick={() => setView('dashboard')}
+            onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
               view === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
@@ -156,7 +171,7 @@ function App() {
             Dashboard
           </button>
           <button 
-            onClick={() => setView('verification')}
+            onClick={() => { setView('verification'); setIsMobileMenuOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
               view === 'verification' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
@@ -165,7 +180,7 @@ function App() {
             Verification
           </button>
           <button 
-            onClick={() => setView('settings')}
+            onClick={() => { setView('settings'); setIsMobileMenuOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
               view === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
@@ -190,7 +205,9 @@ function App() {
       <main className="flex-1 p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8 md:hidden">
           <h1 className="text-xl font-bold text-gray-800">Discord Guardian</h1>
-          <button className="p-2 text-gray-600"><Menu /></button>
+          <button className="p-2 text-gray-600" onClick={() => setIsMobileMenuOpen(true)}>
+            <Menu />
+          </button>
         </header>
 
         {view === 'dashboard' ? (
