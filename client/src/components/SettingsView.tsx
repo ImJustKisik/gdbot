@@ -23,6 +23,11 @@ interface Escalation {
     duration?: number;
 }
 
+interface SelectOption {
+    id: string;
+    name: string;
+}
+
 export const SettingsView: React.FC = () => {
     const [settings, setSettings] = useState<Settings>({
         logChannelId: '',
@@ -32,6 +37,8 @@ export const SettingsView: React.FC = () => {
     });
     const [presets, setPresets] = useState<Preset[]>([]);
     const [escalations, setEscalations] = useState<Escalation[]>([]);
+    const [channels, setChannels] = useState<SelectOption[]>([]);
+    const [roles, setRoles] = useState<SelectOption[]>([]);
     
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetPoints, setNewPresetPoints] = useState(1);
@@ -43,6 +50,7 @@ export const SettingsView: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -50,14 +58,18 @@ export const SettingsView: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const [settingsRes, presetsRes, escalationsRes] = await Promise.all([
+            const [settingsRes, presetsRes, escalationsRes, rolesRes, channelsRes] = await Promise.all([
                 axios.get('/api/settings'),
                 axios.get('/api/presets'),
-                axios.get('/api/escalations')
+                axios.get('/api/escalations'),
+                axios.get('/api/roles'),
+                axios.get('/api/channels')
             ]);
             setSettings(settingsRes.data || {});
             setPresets(Array.isArray(presetsRes.data) ? presetsRes.data : []);
             setEscalations(Array.isArray(escalationsRes.data) ? escalationsRes.data : []);
+            setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
+            setChannels(Array.isArray(channelsRes.data) ? channelsRes.data : []);
         } catch (error) {
             console.error('Failed to fetch settings', error);
         } finally {
@@ -67,18 +79,20 @@ export const SettingsView: React.FC = () => {
 
     const handleSaveSettings = async () => {
         setSaving(true);
+        setFeedback(null);
         try {
             await axios.post('/api/settings', settings);
-            alert('Settings saved!');
-        } catch (error) {
-            alert('Failed to save settings');
+            setFeedback({ type: 'success', message: 'Настройки сохранены.' });
+        } catch (error: any) {
+            const msg = error.response?.data?.error || error.message || 'Не удалось сохранить настройки';
+            setFeedback({ type: 'error', message: msg });
         } finally {
             setSaving(false);
         }
     };
 
     const handleAddPreset = async () => {
-        if (!newPresetName) return;
+        if (!newPresetName.trim()) return;
         try {
             await axios.post('/api/presets', { name: newPresetName, points: newPresetPoints });
             setNewPresetName('');
@@ -90,6 +104,7 @@ export const SettingsView: React.FC = () => {
     };
 
     const handleDeletePreset = async (id: number) => {
+        if (!confirm('Удалить этот пресет предупреждения?')) return;
         try {
             await axios.delete(`/api/presets/${id}`);
             fetchData();
@@ -104,7 +119,7 @@ export const SettingsView: React.FC = () => {
                 name: newRuleName || `Rule ${escalations.length + 1}`,
                 threshold: newRuleThreshold, 
                 action: newRuleAction, 
-                duration: newRuleDuration 
+                duration: newRuleAction === 'mute' ? newRuleDuration : undefined 
             });
             setNewRuleName('');
             fetchData();
@@ -115,6 +130,7 @@ export const SettingsView: React.FC = () => {
     };
 
     const handleDeleteEscalation = async (id: number) => {
+        if (!confirm('Удалить это правило автомодерации?')) return;
         try {
             await axios.delete(`/api/escalations/${id}`);
             fetchData();
@@ -123,10 +139,27 @@ export const SettingsView: React.FC = () => {
         }
     };
 
+    const getChannelDisplay = (id?: string) => {
+        if (!id) return 'Не выбрано';
+        const channel = channels.find(ch => ch.id === id);
+        return channel ? `#${channel.name}` : 'Неизвестный канал';
+    };
+
+    const getRoleDisplay = (id?: string) => {
+        if (!id) return 'Не выбрано';
+        const role = roles.find(r => r.id === id);
+        return role ? role.name : 'Неизвестная роль';
+    };
+
     if (loading) return <div>Loading...</div>;
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
+            {feedback && (
+                <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                    {feedback.message}
+                </div>
+            )}
             
             {/* General Settings */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -136,39 +169,67 @@ export const SettingsView: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Log Channel ID</label>
                         <input 
                             type="text" 
+                            list="log-channel-options"
                             className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.logChannelId}
+                            value={settings.logChannelId || ''}
                             onChange={e => setSettings({...settings, logChannelId: e.target.value})}
                             placeholder="Channel ID for logs"
                         />
+                        <datalist id="log-channel-options">
+                            {channels.map(channel => (
+                                <option key={channel.id} value={channel.id} label={`#${channel.name}`} />
+                            ))}
+                        </datalist>
+                        <p className="text-xs text-gray-500 mt-1">Текущий: {getChannelDisplay(settings.logChannelId)}</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel ID</label>
                         <input 
                             type="text" 
+                            list="verification-channel-options"
                             className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.verificationChannelId}
+                            value={settings.verificationChannelId || ''}
                             onChange={e => setSettings({...settings, verificationChannelId: e.target.value})}
                             placeholder="Channel ID for fallback messages"
                         />
+                        <datalist id="verification-channel-options">
+                            {channels.map(channel => (
+                                <option key={`${channel.id}-verify`} value={channel.id} label={`#${channel.name}`} />
+                            ))}
+                        </datalist>
+                        <p className="text-xs text-gray-500 mt-1">Текущий: {getChannelDisplay(settings.verificationChannelId)}</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Unverified Role Name</label>
                         <input 
                             type="text" 
+                            list="role-unverified-options"
                             className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.roleUnverified}
+                            value={settings.roleUnverified || ''}
                             onChange={e => setSettings({...settings, roleUnverified: e.target.value})}
                         />
+                        <datalist id="role-unverified-options">
+                            {roles.map(role => (
+                                <option key={`${role.id}-unverified`} value={role.id} label={role.name} />
+                            ))}
+                        </datalist>
+                        <p className="text-xs text-gray-500 mt-1">Текущая роль: {getRoleDisplay(settings.roleUnverified)}</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Verified Role Name</label>
                         <input 
                             type="text" 
+                            list="role-verified-options"
                             className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.roleVerified}
+                            value={settings.roleVerified || ''}
                             onChange={e => setSettings({...settings, roleVerified: e.target.value})}
                         />
+                        <datalist id="role-verified-options">
+                            {roles.map(role => (
+                                <option key={`${role.id}-verified`} value={role.id} label={role.name} />
+                            ))}
+                        </datalist>
+                        <p className="text-xs text-gray-500 mt-1">Текущая роль: {getRoleDisplay(settings.roleVerified)}</p>
                     </div>
                 </div>
                 <div className="mt-6 flex justify-end">

@@ -1,9 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const { Client, GatewayIntentBits, Partials, PermissionsBitField, EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, PermissionsBitField, EmbedBuilder, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, REST, Routes, SlashCommandBuilder, ChannelType } = require('discord.js');
 const cors = require('cors');
 const QRCode = require('qrcode');
 const axios = require('axios');
+const crypto = require('crypto');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
@@ -17,11 +18,17 @@ const GENAI_API_KEY = process.env.API_KEY;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`;
-const SESSION_SECRET = process.env.SESSION_SECRET;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+let SESSION_SECRET = process.env.SESSION_SECRET;
 
 if (!SESSION_SECRET) {
-    console.error('FATAL: SESSION_SECRET environment variable is required.');
-    process.exit(1);
+    if (NODE_ENV === 'production') {
+        console.error('FATAL: SESSION_SECRET environment variable is required.');
+        process.exit(1);
+    } else {
+        SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+        console.warn('SESSION_SECRET не задан. Сгенерирован временный секрет для локальной разработки.');
+    }
 }
 
 const VERIFICATION_CHANNEL_NAME = "verification"; // Channel to post if DM fails
@@ -39,6 +46,66 @@ const DEFAULT_SETTINGS = {
 function getAppSetting(key) {
     const val = db.getSetting(key);
     return val !== null ? val : DEFAULT_SETTINGS[key];
+}
+
+const SNOWFLAKE_REGEX = /^\d{5,}$/;
+
+function isSnowflake(value) {
+    return typeof value === 'string' && SNOWFLAKE_REGEX.test(value);
+}
+
+function findChannelBySetting(guild, value) {
+    if (!value) return null;
+    if (isSnowflake(value)) {
+        return guild.channels.cache.get(value) || null;
+    }
+    const needle = value.toLowerCase();
+    return guild.channels.cache.find(channel => (channel.name || '').toLowerCase() === needle) || null;
+}
+
+function isTextBasedGuildChannel(channel) {
+    return channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement);
+}
+
+function normalizeChannelSetting(guild, value, label) {
+    if (value === undefined) return undefined;
+    if (!value) return '';
+    const channel = findChannelBySetting(guild, value);
+    if (!channel) {
+        throw new Error(`${label} не найден. Укажите существующий канал.`);
+    }
+    if (!isTextBasedGuildChannel(channel)) {
+        throw new Error(`${label} должен быть текстовым каналом сервера.`);
+    }
+    return channel.id;
+}
+
+function normalizeRoleSetting(guild, value, label) {
+    if (value === undefined) return undefined;
+    if (!value) return '';
+    const role = findRoleBySetting(guild, value);
+    if (!role) {
+        throw new Error(`${label} не найдена. Укажите существующую роль.`);
+    }
+    return role.id;
+}
+
+function findRoleBySetting(guild, value) {
+    if (!value) return null;
+    if (isSnowflake(value)) {
+        return guild.roles.cache.get(value) || null;
+    }
+    const needle = value.toLowerCase();
+    return guild.roles.cache.find(role => role.name.toLowerCase() === needle) || null;
+}
+
+function getConfiguredRole(guild, settingKey) {
+    const value = getAppSetting(settingKey);
+    const role = findRoleBySetting(guild, value);
+    if (!role && value) {
+        console.warn(`Configured role for ${settingKey}="${value}" not found.`);
+    }
+    return role;
 }
 
 async function logAction(guild, title, description, color = 'Blue', fields = []) {
@@ -307,11 +374,8 @@ app.get('/api/auth/callback', async (req, res) => {
         const guild = await getGuild();
         const member = await fetchGuildMemberSafe(guild, userId);
         if (member) {
-            const unverifiedRoleName = getAppSetting('roleUnverified');
-            const verifiedRoleName = getAppSetting('roleVerified');
-            
-            const roleUnverified = guild.roles.cache.find(r => r.name === unverifiedRoleName);
-            const roleVerified = guild.roles.cache.find(r => r.name === verifiedRoleName);
+            const roleUnverified = getConfiguredRole(guild, 'roleUnverified');
+            const roleVerified = getConfiguredRole(guild, 'roleVerified');
 
             if (roleUnverified) await member.roles.remove(roleUnverified);
             if (roleVerified) await member.roles.add(roleVerified);
@@ -416,12 +480,31 @@ app.get('/api/settings', requireAuth, (req, res) => {
     res.json({ ...DEFAULT_SETTINGS, ...settings });
 });
 
-app.post('/api/settings', requireAuth, (req, res) => {
-    const newSettings = req.body;
-    for (const [key, value] of Object.entries(newSettings)) {
-        db.setSetting(key, value);
+app.post('/api/settings', requireAuth, async (req, res) => {
+    try {
+        const guild = await getGuild();
+        const payload = req.body || {};
+
+        const normalized = {};
+        const logChannelId = normalizeChannelSetting(guild, payload.logChannelId, 'Log Channel');
+        const verificationChannelId = normalizeChannelSetting(guild, payload.verificationChannelId, 'Verification Channel');
+        const roleUnverified = normalizeRoleSetting(guild, payload.roleUnverified, 'Unverified Role');
+        const roleVerified = normalizeRoleSetting(guild, payload.roleVerified, 'Verified Role');
+
+        if (logChannelId !== undefined) normalized.logChannelId = logChannelId;
+        if (verificationChannelId !== undefined) normalized.verificationChannelId = verificationChannelId;
+        if (roleUnverified !== undefined) normalized.roleUnverified = roleUnverified;
+        if (roleVerified !== undefined) normalized.roleVerified = roleVerified;
+
+        for (const [key, value] of Object.entries(normalized)) {
+            db.setSetting(key, value);
+        }
+
+        res.json({ success: true, settings: { ...DEFAULT_SETTINGS, ...db.getAllSettings() } });
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+        res.status(400).json({ error: error.message || 'Failed to save settings' });
     }
-    res.json({ success: true });
 });
 
 // --- Roles API ---
@@ -436,6 +519,20 @@ app.get('/api/roles', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch roles' });
+    }
+});
+
+app.get('/api/channels', requireAuth, async (req, res) => {
+    try {
+        const guild = await getGuild();
+        const channels = guild.channels.cache
+            .filter(channel => isTextBasedGuildChannel(channel))
+            .map(channel => ({ id: channel.id, name: channel.name || `#${channel.id}` }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        res.json(channels);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch channels' });
     }
 });
 
@@ -784,12 +881,11 @@ client.on(Events.GuildMemberAdd, async (member) => {
     console.log(`New member joined: ${member.user.tag}`);
 
     // Add Unverified Role
-    const roleName = getAppSetting('roleUnverified');
-    const roleUnverified = member.guild.roles.cache.find(r => r.name === roleName);
+    const roleUnverified = getConfiguredRole(member.guild, 'roleUnverified');
     if (roleUnverified) {
         await member.roles.add(roleUnverified);
     } else {
-        console.warn(`Role "${roleName}" not found.`);
+        console.warn('Role for roleUnverified not found.');
     }
 
     // Send DM
@@ -1000,11 +1096,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.reply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
 
         } else if (commandName === 'verify') {
-            const unverifiedRoleName = getAppSetting('roleUnverified');
-            const verifiedRoleName = getAppSetting('roleVerified');
-            
-            const roleUnverified = interaction.guild.roles.cache.find(r => r.name === unverifiedRoleName);
-            const roleVerified = interaction.guild.roles.cache.find(r => r.name === verifiedRoleName);
+            const roleUnverified = getConfiguredRole(interaction.guild, 'roleUnverified');
+            const roleVerified = getConfiguredRole(interaction.guild, 'roleVerified');
 
             if (roleUnverified) await targetMember.roles.remove(roleUnverified);
             if (roleVerified) await targetMember.roles.add(roleVerified);
