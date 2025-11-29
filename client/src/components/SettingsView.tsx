@@ -108,8 +108,9 @@ export const SettingsView: React.FC = () => {
             });
             setNewRuleName('');
             fetchData();
-        } catch (error) {
-            alert('Failed to add rule');
+        } catch (error: any) {
+            const msg = error.response?.data?.error || error.message || 'Failed to add rule';
+            alert(msg);
         }
     };
 

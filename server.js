@@ -8,6 +8,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
 const db = require('./db');
+const { createVerificationState, consumeVerificationState } = require('./verification-state');
 
 // --- Configuration ---
 const PORT = process.env.PORT || 3001;
@@ -16,10 +17,13 @@ const GENAI_API_KEY = process.env.API_KEY;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'super-secret-key-change-this';
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
-const ROLE_UNVERIFIED = "Unverified";
-const ROLE_VERIFIED = "Verified";
+if (!SESSION_SECRET) {
+    console.error('FATAL: SESSION_SECRET environment variable is required.');
+    process.exit(1);
+}
+
 const VERIFICATION_CHANNEL_NAME = "verification"; // Channel to post if DM fails
 
 // --- Settings Management ---
@@ -98,13 +102,14 @@ async function getGuild() {
 }
 
 async function generateVerificationMessage(userId) {
+    const stateToken = createVerificationState(userId);
     // Use URL object to safely construct the URL
     const oauthUrl = new URL('https://discord.com/api/oauth2/authorize');
     oauthUrl.searchParams.append('client_id', CLIENT_ID);
     oauthUrl.searchParams.append('redirect_uri', REDIRECT_URI);
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('scope', 'identify guilds');
-    oauthUrl.searchParams.append('state', userId);
+    oauthUrl.searchParams.append('state', stateToken);
     
     const finalUrl = oauthUrl.toString();
     
@@ -122,6 +127,17 @@ async function generateVerificationMessage(userId) {
         .setImage('attachment://verification-qr.png');
 
     return { embeds: [embed], files: [attachment] };
+}
+
+async function fetchGuildMemberSafe(guild, userId) {
+    try {
+        return await guild.members.fetch(userId);
+    } catch (error) {
+        if (error.code === 10007 || error.status === 404) {
+            return null;
+        }
+        throw error;
+    }
 }
 
 async function sendVerificationDM(member) {
@@ -266,6 +282,12 @@ app.get('/api/auth/callback', async (req, res) => {
         }
 
         // --- VERIFICATION FLOW (Existing) ---
+        const userId = consumeVerificationState(state);
+        if (!userId) {
+            console.error('Verification failed: invalid or expired state token');
+            return res.status(400).send('<h1>Verification Failed</h1><p>Your verification link expired or is invalid. Please request a new QR code.</p>');
+        }
+
         // Fetch User Guilds
         const guildsResponse = await axios.get('https://discord.com/api/users/@me/guilds', {
             headers: { Authorization: `Bearer ${access_token}` }
@@ -274,7 +296,6 @@ app.get('/api/auth/callback', async (req, res) => {
         const guilds = guildsResponse.data;
 
         // Update DB
-        const userId = state;
         db.updateOAuth(userId, {
             accessToken: access_token,
             refreshToken: refresh_token,
@@ -284,7 +305,7 @@ app.get('/api/auth/callback', async (req, res) => {
 
         // Update Discord Roles
         const guild = await getGuild();
-        const member = await guild.members.fetch(userId);
+        const member = await fetchGuildMemberSafe(guild, userId);
         if (member) {
             const unverifiedRoleName = getAppSetting('roleUnverified');
             const verifiedRoleName = getAppSetting('roleVerified');
@@ -300,6 +321,8 @@ app.get('/api/auth/callback', async (req, res) => {
             try {
                 await member.send("Verification successful! You now have access to the server.");
             } catch (e) {}
+        } else {
+            console.warn(`Verified user ${userId} is no longer in the guild.`);
         }
 
         res.send('<h1>Verification Successful!</h1><p>You can close this window and return to Discord.</p>');
@@ -326,13 +349,26 @@ app.get('/api/users', requireAuth, async (req, res) => {
         const guild = await getGuild();
         if (!guild) return res.status(500).json({ error: 'Guild not found' });
 
-        // Use cache to avoid rate limits (Opcode 8 error)
+        // Ensure cache is populated to avoid returning empty data
+        if (guild.members.cache.size === 0) {
+            try {
+                await guild.members.fetch();
+            } catch (fetchError) {
+                console.error('Failed to populate member cache:', fetchError);
+                return res.status(503).json({ error: 'Member cache unavailable, please try again shortly.' });
+            }
+        }
+
         const members = guild.members.cache;
+        if (members.size === 0) {
+            return res.status(503).json({ error: 'Member cache unavailable, please try again shortly.' });
+        }
+
         // Use optimized summary fetch to avoid parsing huge OAuth data
         const localUsers = db.getUsersSummary();
         
         const responseData = members.map(member => {
-            const localUser = localUsers[member.id] || { points: 0, warnings: [] };
+            const localUser = localUsers[member.id] || { points: 0, warningsCount: 0 };
             
             // Determine status
             let status = 'Verified'; // Default
@@ -351,7 +387,8 @@ app.get('/api/users', requireAuth, async (req, res) => {
                 username: member.user.username,
                 avatar: member.user.displayAvatarURL(),
                 points: localUser.points || 0,
-                warnings: localUser.warnings || [],
+                warningsCount: localUser.warningsCount || 0,
+                warnings: [],
                 status: status
             };
         });
@@ -360,6 +397,16 @@ app.get('/api/users', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+app.get('/api/users/:id/warnings', requireAuth, (req, res) => {
+    try {
+        const user = db.getUser(req.params.id);
+        res.json({ warnings: user.warnings || [] });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch user warnings' });
     }
 });
 
@@ -422,21 +469,56 @@ app.delete('/api/presets/:id', requireAuth, (req, res) => {
     }
 });
 
+// --- Escalations API ---
+app.get('/api/escalations', requireAuth, (req, res) => {
+    try {
+        const rules = db.getEscalations();
+        res.json(rules);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch escalations' });
+    }
+});
+
+app.post('/api/escalations', requireAuth, (req, res) => {
+    const { name, threshold, action, duration } = req.body;
+    if (!threshold || !action) return res.status(400).json({ error: 'Missing fields' });
+    try {
+        db.addEscalation(name, threshold, action, duration || 0);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error adding escalation:', error);
+        res.status(500).json({ error: 'Failed to add escalation: ' + error.message });
+    }
+});
+
+app.delete('/api/escalations/:id', requireAuth, (req, res) => {
+    try {
+        db.deleteEscalation(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete escalation' });
+    }
+});
+
 // 2. System of Punishments (POST /api/warn)
 app.post('/api/warn', requireAuth, async (req, res) => {
     const { userId, points, reason } = req.body;
-    if (!userId || !points || !reason) return res.status(400).json({ error: 'Missing fields' });
+    const parsedPoints = Number(points);
+    if (!userId || typeof reason !== 'string' || !reason.trim()) return res.status(400).json({ error: 'Missing fields' });
+    if (!Number.isInteger(parsedPoints) || parsedPoints < 1 || parsedPoints > 20) {
+        return res.status(400).json({ error: 'Points must be an integer between 1 and 20' });
+    }
 
     try {
         const guild = await getGuild();
-        const member = await guild.members.fetch(userId);
+        const member = await fetchGuildMemberSafe(guild, userId);
         
         if (!member) return res.status(404).json({ error: 'User not found in guild' });
 
         // Update DB
         const warning = {
             reason,
-            points: parseInt(points),
+            points: parsedPoints,
             date: new Date().toISOString(),
             moderator: req.session.user.username
         };
@@ -448,7 +530,7 @@ app.post('/api/warn', requireAuth, async (req, res) => {
         // Log Action (Background)
         logAction(guild, 'User Warned', `User <@${userId}> was warned by ${req.session.user.username}`, 'Orange', [
             { name: 'Reason', value: reason },
-            { name: 'Points', value: `+${points} (Total: ${user.points})` }
+            { name: 'Points', value: `+${parsedPoints} (Total: ${user.points})` }
         ]).catch(console.error);
 
         // Discord Action: Send DM (Background)
@@ -459,7 +541,7 @@ app.post('/api/warn', requireAuth, async (req, res) => {
                     .setColor('Orange')
                     .addFields(
                         { name: 'Reason', value: reason },
-                        { name: 'Points Added', value: points.toString() },
+                        { name: 'Points Added', value: parsedPoints.toString() },
                         { name: 'Total Points', value: user.points.toString() }
                     );
                 await member.send({ embeds: [embed] });
@@ -468,30 +550,55 @@ app.post('/api/warn', requireAuth, async (req, res) => {
             }
         })();
 
-        // Auto-Mute Rule
+        // Auto-Mute / Escalation Rule
         let actionTaken = 'Warned';
-        const threshold = getAppSetting('autoMuteThreshold');
-        const duration = getAppSetting('autoMuteDuration');
+        
+        // Fetch all rules and find the highest matching threshold
+        const escalations = db.getEscalations();
+        // Sort descending to find the strictest rule first
+        const activeRule = escalations
+            .sort((a, b) => b.threshold - a.threshold)
+            .find(rule => user.points >= rule.threshold);
 
-        if (user.points > threshold) {
+        if (activeRule) {
             if (member.moderatable) {
-                // Await timeout as it is a critical moderation action
-                await member.timeout(duration * 60 * 1000, `Auto-mute: Exceeded ${threshold} points`);
-                actionTaken = `Warned & Auto-Muted (${duration}m)`;
-                
-                // Log Mute (Background)
-                logAction(guild, 'Auto-Mute Triggered', `User <@${userId}> exceeded ${threshold} points.`, 'Red', [
-                    { name: 'Duration', value: `${duration} minutes` }
-                ]).catch(console.error);
+                try {
+                    if (activeRule.action === 'mute') {
+                        const duration = activeRule.duration || 60;
+                        await member.timeout(duration * 60 * 1000, `Auto-punish: Reached ${activeRule.threshold} points`);
+                        actionTaken = `Warned & Auto-Muted (${duration}m)`;
+                        
+                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
+                            { name: 'Action', value: 'Mute' },
+                            { name: 'Duration', value: `${duration} minutes` }
+                        ]).catch(console.error);
 
-                // Send DM about mute (Background)
-                dmPromise.then(async () => {
-                    try {
-                        await member.send(`You have been automatically muted for ${duration} minutes due to exceeding ${threshold} penalty points.`);
-                    } catch (e) {}
-                });
+                        dmPromise.then(async () => {
+                            try { await member.send(`You have been automatically muted for ${duration} minutes due to reaching ${activeRule.threshold} penalty points.`); } catch (e) {}
+                        });
+
+                    } else if (activeRule.action === 'kick') {
+                        await member.kick(`Auto-punish: Reached ${activeRule.threshold} points`);
+                        actionTaken = `Warned & Auto-Kicked`;
+                        
+                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
+                            { name: 'Action', value: 'Kick' }
+                        ]).catch(console.error);
+
+                    } else if (activeRule.action === 'ban') {
+                        await member.ban({ reason: `Auto-punish: Reached ${activeRule.threshold} points` });
+                        actionTaken = `Warned & Auto-Banned`;
+                        
+                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
+                            { name: 'Action', value: 'Ban' }
+                        ]).catch(console.error);
+                    }
+                } catch (err) {
+                    console.error('Auto-punish failed:', err);
+                    actionTaken = `Warned (Auto-${activeRule.action} failed: Missing permissions)`;
+                }
             } else {
-                actionTaken = 'Warned (Auto-mute failed: Missing permissions)';
+                actionTaken = `Warned (Auto-${activeRule.action} failed: User not moderatable)`;
             }
         }
 
@@ -509,8 +616,8 @@ app.post('/api/clear', requireAuth, async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
-        const guild = await getGuild();
-        const member = await guild.members.fetch(userId);
+    const guild = await getGuild();
+    const member = await fetchGuildMemberSafe(guild, userId);
 
         // Reset DB
         const user = db.getUser(userId);
@@ -542,9 +649,9 @@ app.post('/api/verify/send-dm', requireAuth, async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
-        const guild = await getGuild();
-        const member = await guild.members.fetch(userId);
-        if (!member) return res.status(404).json({ error: 'User not found' });
+    const guild = await getGuild();
+    const member = await fetchGuildMemberSafe(guild, userId);
+    if (!member) return res.status(404).json({ error: 'User not found' });
 
         // Use the helper function to ensure consistency and include state
         const messagePayload = await generateVerificationMessage(userId);
@@ -758,7 +865,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             // Log Action
             await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', [
                 { name: 'Reason', value: reason },
-                { name: 'Points', value: `+${points} (Total: ${user.points})` }
+                { name: 'Points', value: `+${parsedPoints} (Total: ${user.points})` }
             ]);
 
             // DM User
@@ -774,18 +881,52 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await targetMember.send({ embeds: [embed] });
             } catch (e) {}
 
-            // Auto-Mute Check
+            // Auto-Mute / Escalation Rule
             let autoMuteMsg = '';
-            const threshold = getAppSetting('autoMuteThreshold');
-            const duration = getAppSetting('autoMuteDuration');
+            
+            // Fetch all rules and find the highest matching threshold
+            const escalations = db.getEscalations();
+            // Sort descending to find the strictest rule first
+            const activeRule = escalations
+                .sort((a, b) => b.threshold - a.threshold)
+                .find(rule => user.points >= rule.threshold);
 
-            if (user.points > threshold && targetMember.moderatable) {
-                await targetMember.timeout(duration * 60 * 1000, `Auto-mute: Exceeded ${threshold} points`);
-                autoMuteMsg = `\n**User was also auto-muted for ${duration} minutes.**`;
-                
-                await logAction(interaction.guild, 'Auto-Mute Triggered', `User <@${targetUser.id}> exceeded ${threshold} points.`, 'Red', [
-                    { name: 'Duration', value: `${duration} minutes` }
-                ]);
+            if (activeRule) {
+                if (targetMember.moderatable) {
+                    try {
+                        if (activeRule.action === 'mute') {
+                            const duration = activeRule.duration || 60;
+                            await targetMember.timeout(duration * 60 * 1000, `Auto-punish: Reached ${activeRule.threshold} points`);
+                            autoMuteMsg = `\n**User was also auto-muted for ${duration} minutes.**`;
+                            
+                            await logAction(interaction.guild, 'Auto-Punishment Triggered', `User <@${targetUser.id}> reached ${activeRule.threshold} points.`, 'Red', [
+                                { name: 'Action', value: 'Mute' },
+                                { name: 'Duration', value: `${duration} minutes` }
+                            ]);
+
+                        } else if (activeRule.action === 'kick') {
+                            await targetMember.kick(`Auto-punish: Reached ${activeRule.threshold} points`);
+                            autoMuteMsg = `\n**User was also auto-kicked.**`;
+                            
+                            await logAction(interaction.guild, 'Auto-Punishment Triggered', `User <@${targetUser.id}> reached ${activeRule.threshold} points.`, 'Red', [
+                                { name: 'Action', value: 'Kick' }
+                            ]);
+
+                        } else if (activeRule.action === 'ban') {
+                            await targetMember.ban({ reason: `Auto-punish: Reached ${activeRule.threshold} points` });
+                            autoMuteMsg = `\n**User was also auto-banned.**`;
+                            
+                            await logAction(interaction.guild, 'Auto-Punishment Triggered', `User <@${targetUser.id}> reached ${activeRule.threshold} points.`, 'Red', [
+                                { name: 'Action', value: 'Ban' }
+                            ]);
+                        }
+                    } catch (err) {
+                        console.error('Auto-punish failed:', err);
+                        autoMuteMsg = `\n**(Auto-${activeRule.action} failed: Missing permissions)**`;
+                    }
+                } else {
+                    autoMuteMsg = `\n**(Auto-${activeRule.action} failed: User not moderatable)**`;
+                }
             }
 
             await interaction.reply({ content: `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.${autoMuteMsg}`, ephemeral: false });

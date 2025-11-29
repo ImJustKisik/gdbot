@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User } from '../types';
+import { User, Warning } from '../types';
 import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History } from 'lucide-react';
 import axios from 'axios';
 
@@ -25,6 +25,9 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const [loadingGuilds, setLoadingGuilds] = useState(false);
 
   const [historyUser, setHistoryUser] = useState<User | null>(null);
+  const [historyWarnings, setHistoryWarnings] = useState<Warning[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
   
@@ -93,6 +96,29 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+
+  const openHistoryModal = async (user: User) => {
+    setHistoryUser(user);
+    setHistoryWarnings(null);
+    setHistoryError(null);
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get(`/api/users/${user.id}/warnings`);
+      setHistoryWarnings(res.data.warnings || []);
+    } catch (err) {
+      console.error(err);
+      setHistoryWarnings([]);
+      setHistoryError('Failed to load warning history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const closeHistoryModal = () => {
+    setHistoryUser(null);
+    setHistoryWarnings(null);
+    setHistoryError(null);
   };
 
   const filteredAndSortedUsers = useMemo(() => {
@@ -179,7 +205,10 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4 flex items-center gap-3">
                   <img src={user.avatar} alt="" className="w-10 h-10 rounded-full" />
-                  <span className="font-medium text-gray-900">{user.username}</span>
+                  <div>
+                    <p className="font-medium text-gray-900">{user.username}</p>
+                    <p className="text-xs text-gray-500">Warnings: {user.warningsCount}</p>
+                  </div>
                 </td>
                 <td className="p-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -209,7 +238,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                       <Server size={18} />
                     </button>
                     <button 
-                      onClick={() => setHistoryUser(user)}
+                      onClick={() => openHistoryModal(user)}
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                       title="View History"
                     >
@@ -324,14 +353,18 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Warning History: {historyUser.username}</h3>
-              <button onClick={() => setHistoryUser(null)} className="text-gray-500 hover:text-gray-700">Close</button>
+              <button onClick={closeHistoryModal} className="text-gray-500 hover:text-gray-700">Close</button>
             </div>
 
-            {historyUser.warnings.length === 0 ? (
+            {historyLoading ? (
+              <p className="text-gray-500 text-center py-8">Loading warnings...</p>
+            ) : historyError ? (
+              <p className="text-red-500 text-center py-8">{historyError}</p>
+            ) : historyWarnings && historyWarnings.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No warnings recorded for this user.</p>
             ) : (
               <div className="space-y-4">
-                {historyUser.warnings.map((warning, idx) => (
+                {(historyWarnings || []).map((warning, idx) => (
                   <div key={idx} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
                     <div className="flex justify-between items-start mb-2">
                       <span className="font-semibold text-gray-900">{warning.reason}</span>

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Users, ShieldAlert, MicOff } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { User } from '../types';
+import axios from 'axios';
 
 interface Props {
   users: User[];
@@ -10,41 +11,55 @@ interface Props {
 export const DashboardStats: React.FC<Props> = ({ users }) => {
   const totalUsers = users.length;
   const mutedUsers = users.filter(u => u.status === 'Muted').length;
-  const totalWarns = users.reduce((acc, u) => acc + u.warnings.length, 0);
+  const totalWarns = useMemo(() => users.reduce((acc, u) => acc + (u.warningsCount || 0), 0), [users]);
 
-  const weeklyData = useMemo(() => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 = Sun, 1 = Mon, ...
-    // Calculate Monday of the current week
-    // If Sunday (0), we want to go back 6 days. If Mon (1), go back 0. If Tue (2), go back 1.
-    const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-    
-    const monday = new Date(today);
-    monday.setDate(diff);
-    monday.setHours(0, 0, 0, 0);
+  const [weeklyData, setWeeklyData] = useState(
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(name => ({ name, warns: 0 }))
+  );
 
-    const counts = new Array(7).fill(0);
+  useEffect(() => {
+    let cancelled = false;
 
-    users.forEach(user => {
-      if (!user.warnings) return;
-      user.warnings.forEach(warning => {
-        const wDate = new Date(warning.date);
-        // Check if warning is after or on Monday
-        if (wDate >= monday) {
-          const dayDiff = Math.floor((wDate.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24));
+    const loadActivity = async () => {
+      try {
+        const res = await axios.get('/api/stats/activity');
+        if (!Array.isArray(res.data) || cancelled) return;
+
+        const today = new Date();
+        const currentDay = today.getDay();
+        const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+        const monday = new Date(today);
+        monday.setDate(diff);
+        monday.setHours(0, 0, 0, 0);
+
+        const counts = new Array(7).fill(0);
+        res.data.forEach((row: { day: string; count: number }) => {
+          const statDate = new Date(row.day);
+          statDate.setHours(0, 0, 0, 0);
+          if (statDate < monday) return;
+          const dayDiff = Math.floor((statDate.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24));
           if (dayDiff >= 0 && dayDiff < 7) {
-            counts[dayDiff]++;
+            counts[dayDiff] += row.count;
           }
-        }
-      });
-    });
+        });
 
-    return days.map((name, i) => ({
-      name,
-      warns: counts[i]
-    }));
-  }, [users]);
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        if (!cancelled) {
+          setWeeklyData(days.map((name, i) => ({ name, warns: counts[i] })));
+        }
+      } catch (error) {
+        console.error('Failed to load activity stats', error);
+      }
+    };
+
+    loadActivity();
+    const interval = setInterval(loadActivity, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

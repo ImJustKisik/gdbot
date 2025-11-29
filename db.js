@@ -44,10 +44,30 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users_v2(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS escalations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    threshold INTEGER,
+    action TEXT, -- 'mute', 'kick', 'ban'
+    duration INTEGER -- minutes (only for mute)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_warnings_user_id ON warnings(user_id);
 `);
 
 // --- Migrations ---
+
+// 0. Add 'name' column to escalations if missing
+try {
+    const tableInfo = db.prepare("PRAGMA table_info(escalations)").all();
+    const hasName = tableInfo.some(col => col.name === 'name');
+    if (!hasName && tableInfo.length > 0) {
+        console.log("Migrating escalations table: Adding 'name' column...");
+        db.exec("ALTER TABLE escalations ADD COLUMN name TEXT DEFAULT 'Rule'");
+    }
+} catch (e) {
+    console.error("Migration check failed:", e);
+}
 
 // 1. JSON to SQLite Blob (Legacy)
 function migrateFromJson() {
@@ -185,30 +205,24 @@ module.exports = {
 
     // Optimized summary for lists (Dashboard)
     getUsersSummary: () => {
-        const users = db.prepare('SELECT id, points FROM users_v2').all();
-        const result = {};
-        
-        // We can fetch warnings in bulk or just return points for speed. 
-        // For the dashboard list, we usually need points and maybe warning count.
-        // Let's do a join to get warning counts if needed, but for now let's stick to what we had.
-        // To match previous behavior, we need warnings array.
-        
-        // Optimization: Fetch all warnings in one go
-        const allWarnings = db.prepare('SELECT user_id, reason, points, date, moderator FROM warnings').all();
-        const warningsMap = {};
-        
-        for (const w of allWarnings) {
-            if (!warningsMap[w.user_id]) warningsMap[w.user_id] = [];
-            warningsMap[w.user_id].push(w);
-        }
+        const rows = db.prepare(`
+            SELECT u.id, u.points, COALESCE(w.warning_count, 0) AS warningsCount
+            FROM users_v2 u
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) AS warning_count
+                FROM warnings
+                GROUP BY user_id
+            ) w ON w.user_id = u.id
+        `).all();
 
-        for (const user of users) {
-            result[user.id] = {
-                points: user.points,
-                warnings: warningsMap[user.id] || []
+        const result = {};
+        for (const row of rows) {
+            result[row.id] = {
+                points: row.points,
+                warningsCount: row.warningsCount
             };
         }
-        
+
         return result;
     },
 
@@ -328,6 +342,17 @@ module.exports = {
     },
     deletePreset: (id) => {
         db.prepare('DELETE FROM presets WHERE id = ?').run(id);
+    },
+
+    // --- Escalations ---
+    getEscalations: () => {
+        return db.prepare('SELECT * FROM escalations ORDER BY threshold ASC').all();
+    },
+    addEscalation: (name, threshold, action, duration) => {
+        return db.prepare('INSERT INTO escalations (name, threshold, action, duration) VALUES (?, ?, ?, ?)').run(name || 'Rule', threshold, action, duration);
+    },
+    deleteEscalation: (id) => {
+        db.prepare('DELETE FROM escalations WHERE id = ?').run(id);
     },
     
     // Deprecated but kept for safety if I missed something

@@ -10,6 +10,7 @@ export interface User {
   username: string;
   avatar: string;
   points: number;
-  warnings: Warning[];
+  warningsCount: number;
+  warnings?: Warning[];
   status: 'Verified' | 'Muted';
 }
