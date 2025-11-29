@@ -28,6 +28,8 @@ export const AnalyticsView: React.FC = () => {
                     axios.get('/api/stats/activity')
                 ]);
                 
+                console.log("Analytics Data Received:", { guilds: guildsRes.data, activity: activityRes.data });
+
                 if (Array.isArray(guildsRes.data)) {
                     setGuildStats(guildsRes.data);
                 }
@@ -61,24 +63,31 @@ export const AnalyticsView: React.FC = () => {
                 </div>
 
                 <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={guildStats} layout="vertical" margin={{ left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" hide />
-                            <YAxis 
-                                dataKey="name" 
-                                type="category" 
-                                width={100} 
-                                tick={{fontSize: 12}} 
-                                tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val}
-                            />
-                            <Tooltip 
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                cursor={{fill: '#f3f4f6'}}
-                            />
-                            <Bar dataKey="count" fill="#4F46E5" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {guildStats.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={guildStats} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" hide />
+                                <YAxis 
+                                    dataKey="name" 
+                                    type="category" 
+                                    width={120} 
+                                    tick={{fontSize: 11}} 
+                                    tickFormatter={(val) => val && typeof val === 'string' ? (val.length > 15 ? val.substring(0, 15) + '...' : val) : ''}
+                                />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    cursor={{fill: '#f3f4f6'}}
+                                />
+                                <Bar dataKey="count" fill="#4F46E5" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                            <BarChart3 size={48} className="mb-2 opacity-20" />
+                            <p>No server data available</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
