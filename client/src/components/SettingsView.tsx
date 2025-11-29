@@ -53,9 +53,9 @@ export const SettingsView: React.FC = () => {
                 axios.get('/api/presets'),
                 axios.get('/api/escalations')
             ]);
-            setSettings(settingsRes.data);
-            setPresets(presetsRes.data);
-            setEscalations(escalationsRes.data);
+            setSettings(settingsRes.data || {});
+            setPresets(Array.isArray(presetsRes.data) ? presetsRes.data : []);
+            setEscalations(Array.isArray(escalationsRes.data) ? escalationsRes.data : []);
         } catch (error) {
             console.error('Failed to fetch settings', error);
         } finally {
@@ -191,7 +191,7 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 <div className="space-y-4 mb-6">
-                    {escalations.map(rule => (
+                    {Array.isArray(escalations) && escalations.map(rule => (
                         <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-4">
                                 <span className="font-bold text-gray-700 w-24">≥ {rule.threshold} pts</span>
@@ -268,7 +268,7 @@ export const SettingsView: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h2 className="text-xl font-bold mb-6 text-gray-800">Warning Presets</h2>
                 <div className="space-y-3 mb-6">
-                    {presets.map(preset => (
+                    {Array.isArray(presets) && presets.map(preset => (
                         <div key={preset.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div>
                                 <span className="font-medium text-gray-900">{preset.name}</span>
