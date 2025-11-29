@@ -6,6 +6,7 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const session = require('express-session');
+const SQLiteStore = require('./session-store');
 const db = require('./db');
 
 // --- Configuration ---
@@ -74,10 +75,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(session({
+    store: new SQLiteStore(),
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Set to true if using HTTPS
+    cookie: { 
+        secure: false, // Set to true if using HTTPS
+        maxAge: 1000 * 60 * 60 // 1 hour
+    } 
 }));
 
 // --- AI Setup ---
@@ -550,6 +555,27 @@ app.post('/api/verify/send-dm', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to send verification DM' });
+    }
+});
+
+// 5. Analytics (GET /api/stats)
+app.get('/api/stats/guilds', requireAuth, (req, res) => {
+    try {
+        const stats = db.getGuildStats();
+        res.json(stats);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch guild stats' });
+    }
+});
+
+app.get('/api/stats/activity', requireAuth, (req, res) => {
+    try {
+        const stats = db.getWarningStats();
+        res.json(stats);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch activity stats' });
     }
 });
 

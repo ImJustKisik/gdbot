@@ -149,7 +149,19 @@ function migrateToNormalized() {
 migrateFromJson();
 migrateToNormalized();
 
+// Create sessions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT,
+    expired DATETIME
+  );
+`);
+
 module.exports = {
+    // Expose raw db instance for session store
+    db: db,
+
     // --- User Methods ---
     
     // Get full user object (Composite) - For backward compatibility and full profile view
@@ -198,6 +210,52 @@ module.exports = {
         }
         
         return result;
+    },
+
+    // --- Analytics Methods ---
+
+    getGuildStats: () => {
+        // Fetch all stored guild lists
+        const rows = db.prepare('SELECT guilds FROM user_oauth').all();
+        const stats = {}; // guildId -> { name, icon, count }
+
+        for (const row of rows) {
+            if (!row.guilds) continue;
+            try {
+                const guilds = JSON.parse(row.guilds);
+                for (const guild of guilds) {
+                    if (!stats[guild.id]) {
+                        stats[guild.id] = { 
+                            id: guild.id,
+                            name: guild.name, 
+                            icon: guild.icon, 
+                            count: 0 
+                        };
+                    }
+                    stats[guild.id].count++;
+                }
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+
+        // Convert to array and sort by count descending
+        return Object.values(stats)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10); // Top 10
+    },
+
+    getWarningStats: () => {
+        // Group warnings by date (YYYY-MM-DD)
+        // SQLite's substr(date, 1, 10) extracts YYYY-MM-DD from ISO string
+        const rows = db.prepare(`
+            SELECT substr(date, 1, 10) as day, count(*) as count 
+            FROM warnings 
+            GROUP BY day 
+            ORDER BY day ASC 
+            LIMIT 30
+        `).all();
+        return rows;
     },
 
     // --- Write Methods (New) ---
