@@ -17,6 +17,7 @@ interface Preset {
 
 interface Escalation {
     id: number;
+    name?: string;
     threshold: number;
     action: 'mute' | 'kick' | 'ban';
     duration?: number;
@@ -35,6 +36,7 @@ export const SettingsView: React.FC = () => {
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetPoints, setNewPresetPoints] = useState(1);
 
+    const [newRuleName, setNewRuleName] = useState('');
     const [newRuleThreshold, setNewRuleThreshold] = useState(10);
     const [newRuleAction, setNewRuleAction] = useState<'mute' | 'kick' | 'ban'>('mute');
     const [newRuleDuration, setNewRuleDuration] = useState(60);
@@ -99,10 +101,12 @@ export const SettingsView: React.FC = () => {
     const handleAddEscalation = async () => {
         try {
             await axios.post('/api/escalations', { 
+                name: newRuleName || `Rule ${escalations.length + 1}`,
                 threshold: newRuleThreshold, 
                 action: newRuleAction, 
                 duration: newRuleDuration 
             });
+            setNewRuleName('');
             fetchData();
         } catch (error) {
             alert('Failed to add rule');
@@ -194,7 +198,10 @@ export const SettingsView: React.FC = () => {
                     {Array.isArray(escalations) && escalations.map(rule => (
                         <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-4">
-                                <span className="font-bold text-gray-700 w-24">≥ {rule.threshold} pts</span>
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-gray-800">{rule.name || 'Rule'}</span>
+                                    <span className="text-sm text-gray-500">≥ {rule.threshold} pts</span>
+                                </div>
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                                     rule.action === 'ban' ? 'bg-red-100 text-red-700' : 
                                     rule.action === 'kick' ? 'bg-orange-100 text-orange-700' : 
@@ -220,6 +227,16 @@ export const SettingsView: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg border border-gray-200 border-dashed">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                        <input 
+                            type="text" 
+                            className="w-32 p-2 border border-gray-300 rounded-lg"
+                            value={newRuleName}
+                            onChange={e => setNewRuleName(e.target.value)}
+                            placeholder="e.g. Mute 1h"
+                        />
+                    </div>
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Threshold (Pts)</label>
                         <input 
