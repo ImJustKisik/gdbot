@@ -7,6 +7,8 @@ interface Settings {
     verificationChannelId: string;
     roleUnverified: string;
     roleVerified: string;
+    autoMuteThreshold: number;
+    autoMuteDuration: number;
 }
 
 interface Preset {
@@ -28,13 +30,25 @@ interface SelectOption {
     name: string;
 }
 
+interface SettingsBundleResponse {
+    settings?: Settings;
+    presets?: Preset[];
+    escalations?: Escalation[];
+    roles?: SelectOption[];
+    channels?: SelectOption[];
+}
+
+const INITIAL_SETTINGS: Settings = {
+    logChannelId: '',
+    verificationChannelId: '',
+    roleUnverified: '',
+    roleVerified: '',
+    autoMuteThreshold: 20,
+    autoMuteDuration: 60
+};
+
 export const SettingsView: React.FC = () => {
-    const [settings, setSettings] = useState<Settings>({
-        logChannelId: '',
-        verificationChannelId: '',
-        roleUnverified: '',
-        roleVerified: ''
-    });
+    const [settings, setSettings] = useState<Settings>({ ...INITIAL_SETTINGS });
     const [presets, setPresets] = useState<Preset[]>([]);
     const [escalations, setEscalations] = useState<Escalation[]>([]);
     const [channels, setChannels] = useState<SelectOption[]>([]);
@@ -51,6 +65,7 @@ export const SettingsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -58,20 +73,23 @@ export const SettingsView: React.FC = () => {
 
     const fetchData = async () => {
         try {
-            const [settingsRes, presetsRes, escalationsRes, rolesRes, channelsRes] = await Promise.all([
-                axios.get('/api/settings'),
-                axios.get('/api/presets'),
-                axios.get('/api/escalations'),
-                axios.get('/api/roles'),
-                axios.get('/api/channels')
-            ]);
-            setSettings(settingsRes.data || {});
-            setPresets(Array.isArray(presetsRes.data) ? presetsRes.data : []);
-            setEscalations(Array.isArray(escalationsRes.data) ? escalationsRes.data : []);
-            setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
-            setChannels(Array.isArray(channelsRes.data) ? channelsRes.data : []);
+            setLoadError(null);
+            const res = await axios.get<SettingsBundleResponse>('/api/settings/bundle');
+            const data = res.data || {};
+            const bundleSettings = data.settings || { ...INITIAL_SETTINGS };
+            setSettings({
+                ...INITIAL_SETTINGS,
+                ...bundleSettings,
+                autoMuteThreshold: Number(bundleSettings.autoMuteThreshold ?? INITIAL_SETTINGS.autoMuteThreshold),
+                autoMuteDuration: Number(bundleSettings.autoMuteDuration ?? INITIAL_SETTINGS.autoMuteDuration)
+            });
+            setPresets(Array.isArray(data.presets) ? data.presets : []);
+            setEscalations(Array.isArray(data.escalations) ? data.escalations : []);
+            setRoles(Array.isArray(data.roles) ? data.roles : []);
+            setChannels(Array.isArray(data.channels) ? data.channels : []);
         } catch (error) {
-            console.error('Failed to fetch settings', error);
+            console.error('Failed to fetch settings bundle', error);
+            setLoadError('Не удалось загрузить настройки. Проверьте соединение с ботом и повторите попытку.');
         } finally {
             setLoading(false);
         }
@@ -81,7 +99,15 @@ export const SettingsView: React.FC = () => {
         setSaving(true);
         setFeedback(null);
         try {
-            await axios.post('/api/settings', settings);
+            const payload = {
+                ...settings,
+                autoMuteThreshold: Number(settings.autoMuteThreshold) || 0,
+                autoMuteDuration: Math.max(1, Number(settings.autoMuteDuration) || INITIAL_SETTINGS.autoMuteDuration)
+            };
+            const response = await axios.post('/api/settings', payload);
+            if (response.data?.settings) {
+                setSettings(response.data.settings);
+            }
             setFeedback({ type: 'success', message: 'Настройки сохранены.' });
         } catch (error: any) {
             const msg = error.response?.data?.error || error.message || 'Не удалось сохранить настройки';
@@ -97,7 +123,7 @@ export const SettingsView: React.FC = () => {
             await axios.post('/api/presets', { name: newPresetName, points: newPresetPoints });
             setNewPresetName('');
             setNewPresetPoints(1);
-            fetchData();
+            await fetchData();
         } catch (error) {
             alert('Failed to add preset');
         }
@@ -107,7 +133,7 @@ export const SettingsView: React.FC = () => {
         if (!confirm('Удалить этот пресет предупреждения?')) return;
         try {
             await axios.delete(`/api/presets/${id}`);
-            fetchData();
+            await fetchData();
         } catch (error) {
             alert('Failed to delete preset');
         }
@@ -122,7 +148,7 @@ export const SettingsView: React.FC = () => {
                 duration: newRuleAction === 'mute' ? newRuleDuration : undefined 
             });
             setNewRuleName('');
-            fetchData();
+            await fetchData();
         } catch (error: any) {
             const msg = error.response?.data?.error || error.message || 'Failed to add rule';
             alert(msg);
@@ -133,7 +159,7 @@ export const SettingsView: React.FC = () => {
         if (!confirm('Удалить это правило автомодерации?')) return;
         try {
             await axios.delete(`/api/escalations/${id}`);
-            fetchData();
+            await fetchData();
         } catch (error) {
             alert('Failed to delete rule');
         }
@@ -151,13 +177,39 @@ export const SettingsView: React.FC = () => {
         return role ? role.name : 'Неизвестная роль';
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) {
+        return (
+            <div className="space-y-4">
+                {[0, 1, 2].map(index => (
+                    <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-1/3 mb-6" />
+                        <div className="space-y-3">
+                            <div className="h-3 bg-gray-100 rounded" />
+                            <div className="h-3 bg-gray-100 rounded w-5/6" />
+                            <div className="h-3 bg-gray-100 rounded w-2/3" />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
             {feedback && (
                 <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
                     {feedback.message}
+                </div>
+            )}
+            {loadError && (
+                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <span>{loadError}</span>
+                    <button
+                        onClick={() => { setLoading(true); fetchData(); }}
+                        className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                    >
+                        Повторить
+                    </button>
                 </div>
             )}
             
@@ -241,6 +293,38 @@ export const SettingsView: React.FC = () => {
                         <Save size={18} />
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
+                </div>
+            </div>
+
+            {/* Default Auto-Mute Settings */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 className="text-xl font-bold mb-2 text-gray-800">Auto-Mute Defaults</h2>
+                <p className="text-sm text-gray-500 mb-6">Эти параметры используются, если ни одно правило эскалации не срабатывает. Порог = 0 отключает автоматический таймаут.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Порог (очки)</label>
+                        <input 
+                            type="number"
+                            min={0}
+                            max={200}
+                            className="w-full p-2 border border-gray-300 rounded-lg"
+                            value={settings.autoMuteThreshold}
+                            onChange={e => setSettings(prev => ({ ...prev, autoMuteThreshold: Math.max(0, Number(e.target.value)) }))}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">По умолчанию: 20. Значение 0 отключает правило.</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Длительность таймаута (мин)</label>
+                        <input 
+                            type="number"
+                            min={1}
+                            max={10080}
+                            className="w-full p-2 border border-gray-300 rounded-lg"
+                            value={settings.autoMuteDuration}
+                            onChange={e => setSettings(prev => ({ ...prev, autoMuteDuration: Math.max(1, Number(e.target.value)) }))}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">По умолчанию: 60 минут.</p>
+                    </div>
                 </div>
             </div>
 

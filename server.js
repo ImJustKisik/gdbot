@@ -197,14 +197,13 @@ async function generateVerificationMessage(userId) {
 }
 
 async function fetchGuildMemberSafe(guild, userId) {
-    try {
-        return await guild.members.fetch(userId);
-    } catch (error) {
+    const member = await guild.members.fetch(userId).catch(error => {
         if (error.code === 10007 || error.status === 404) {
             return null;
         }
         throw error;
-    }
+    });
+    return member;
 }
 
 async function sendVerificationDM(member) {
@@ -490,11 +489,32 @@ app.post('/api/settings', requireAuth, async (req, res) => {
         const verificationChannelId = normalizeChannelSetting(guild, payload.verificationChannelId, 'Verification Channel');
         const roleUnverified = normalizeRoleSetting(guild, payload.roleUnverified, 'Unverified Role');
         const roleVerified = normalizeRoleSetting(guild, payload.roleVerified, 'Verified Role');
+        const parseNumberSetting = (value, label, { min = 0, max = 100000, allowZero = true } = {}) => {
+            if (value === undefined) return undefined;
+            if (value === '' || value === null) {
+                return allowZero ? 0 : min;
+            }
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) {
+                throw new Error(`${label} должно быть числом.`);
+            }
+            const rounded = Math.round(parsed);
+            if (rounded < min || rounded > max) {
+                throw new Error(`${label} должно быть в диапазоне ${min}-${max}.`);
+            }
+            return rounded;
+        };
 
         if (logChannelId !== undefined) normalized.logChannelId = logChannelId;
         if (verificationChannelId !== undefined) normalized.verificationChannelId = verificationChannelId;
         if (roleUnverified !== undefined) normalized.roleUnverified = roleUnverified;
         if (roleVerified !== undefined) normalized.roleVerified = roleVerified;
+
+        const autoMuteThreshold = parseNumberSetting(payload.autoMuteThreshold, 'Auto-mute threshold', { min: 0, max: 200, allowZero: true });
+        const autoMuteDuration = parseNumberSetting(payload.autoMuteDuration, 'Auto-mute duration', { min: 1, max: 10080, allowZero: false });
+
+        if (autoMuteThreshold !== undefined) normalized.autoMuteThreshold = autoMuteThreshold;
+        if (autoMuteDuration !== undefined) normalized.autoMuteDuration = autoMuteDuration;
 
         for (const [key, value] of Object.entries(normalized)) {
             db.setSetting(key, value);
@@ -650,12 +670,14 @@ app.post('/api/warn', requireAuth, async (req, res) => {
         // Auto-Mute / Escalation Rule
         let actionTaken = 'Warned';
         
-        // Fetch all rules and find the highest matching threshold
         const escalations = db.getEscalations();
-        // Sort descending to find the strictest rule first
         const activeRule = escalations
             .sort((a, b) => b.threshold - a.threshold)
             .find(rule => user.points >= rule.threshold);
+
+        const defaultAutoMuteThreshold = Number(getAppSetting('autoMuteThreshold')) || 0;
+        const defaultAutoMuteDuration = Number(getAppSetting('autoMuteDuration')) || 60;
+        const shouldApplyFallbackMute = !activeRule && defaultAutoMuteThreshold > 0 && user.points >= defaultAutoMuteThreshold;
 
         if (activeRule) {
             if (member.moderatable) {
@@ -696,6 +718,28 @@ app.post('/api/warn', requireAuth, async (req, res) => {
                 }
             } else {
                 actionTaken = `Warned (Auto-${activeRule.action} failed: User not moderatable)`;
+            }
+        } else if (shouldApplyFallbackMute) {
+            if (member.moderatable) {
+                const duration = Math.max(1, defaultAutoMuteDuration);
+                try {
+                    await member.timeout(duration * 60 * 1000, `Auto-punish (default): Reached ${defaultAutoMuteThreshold} points`);
+                    actionTaken = `Warned & Auto-Muted (${duration}m)`;
+
+                    logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached the default ${defaultAutoMuteThreshold} point threshold.`, 'Red', [
+                        { name: 'Action', value: 'Mute (Default Rule)' },
+                        { name: 'Duration', value: `${duration} minutes` }
+                    ]).catch(console.error);
+
+                    dmPromise.then(async () => {
+                        try { await member.send(`You have been automatically muted for ${duration} minutes due to reaching ${defaultAutoMuteThreshold} penalty points.`); } catch (e) {}
+                    });
+                } catch (err) {
+                    console.error('Default auto-mute failed:', err);
+                    actionTaken = 'Warned (Default auto-mute failed: Missing permissions)';
+                }
+            } else {
+                actionTaken = 'Warned (Default auto-mute failed: User not moderatable)';
             }
         }
 
@@ -945,6 +989,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     try {
         if (commandName === 'warn') {
+            await interaction.deferReply({ ephemeral: false });
+
             const reason = interaction.options.getString('reason');
             const points = interaction.options.getInteger('points') || 1;
 
@@ -958,13 +1004,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             
             const user = db.getUser(targetUser.id);
 
-            // Log Action
             await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', [
                 { name: 'Reason', value: reason },
-                { name: 'Points', value: `+${parsedPoints} (Total: ${user.points})` }
+                { name: 'Points', value: `+${points} (Total: ${user.points})` }
             ]);
 
-            // DM User
             try {
                 const embed = new EmbedBuilder()
                     .setTitle('You have been warned')
@@ -977,15 +1021,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 await targetMember.send({ embeds: [embed] });
             } catch (e) {}
 
-            // Auto-Mute / Escalation Rule
             let autoMuteMsg = '';
-            
-            // Fetch all rules and find the highest matching threshold
+
             const escalations = db.getEscalations();
-            // Sort descending to find the strictest rule first
             const activeRule = escalations
                 .sort((a, b) => b.threshold - a.threshold)
                 .find(rule => user.points >= rule.threshold);
+
+            const defaultAutoMuteThreshold = Number(getAppSetting('autoMuteThreshold')) || 0;
+            const defaultAutoMuteDuration = Number(getAppSetting('autoMuteDuration')) || 60;
 
             if (activeRule) {
                 if (targetMember.moderatable) {
@@ -1023,11 +1067,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 } else {
                     autoMuteMsg = `\n**(Auto-${activeRule.action} failed: User not moderatable)**`;
                 }
+            } else if (defaultAutoMuteThreshold > 0 && user.points >= defaultAutoMuteThreshold) {
+                if (targetMember.moderatable) {
+                    const duration = Math.max(1, defaultAutoMuteDuration);
+                    try {
+                        await targetMember.timeout(duration * 60 * 1000, `Auto-punish (default): Reached ${defaultAutoMuteThreshold} points`);
+                        autoMuteMsg = `\n**User was also auto-muted for ${duration} minutes (default rule).**`;
+
+                        await logAction(interaction.guild, 'Auto-Punishment Triggered', `User <@${targetUser.id}> reached the default ${defaultAutoMuteThreshold} point threshold.`, 'Red', [
+                            { name: 'Action', value: 'Mute (Default Rule)' },
+                            { name: 'Duration', value: `${duration} minutes` }
+                        ]);
+                    } catch (err) {
+                        console.error('Default auto-mute failed:', err);
+                        autoMuteMsg = `\n**(Default auto-mute failed: Missing permissions)**`;
+                    }
+                } else {
+                    autoMuteMsg = '\n**(Default auto-mute failed: User not moderatable)**';
+                }
             }
 
-            await interaction.reply({ content: `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.${autoMuteMsg}`, ephemeral: false });
+            const baseMessage = `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.`;
+            await interaction.editReply({ content: `${baseMessage}${autoMuteMsg}` });
+            return;
 
         } else if (commandName === 'profile') {
+            await interaction.deferReply({ ephemeral: false });
+
             const user = db.getUser(targetUser.id);
             const embed = new EmbedBuilder()
                 .setTitle(`Profile: ${targetUser.tag}`)
@@ -1044,16 +1110,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 embed.addFields({ name: 'Recent Warnings', value: lastWarnings });
             }
 
-            await interaction.reply({ embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
+            return;
 
         } else if (commandName === 'clear') {
+            await interaction.deferReply({ ephemeral: false });
+
             db.clearPunishments(targetUser.id);
 
             if (targetMember.moderatable && targetMember.communicationDisabledUntilTimestamp > Date.now()) {
                 await targetMember.timeout(null, 'Punishments cleared');
             }
 
-            await interaction.reply({ content: `✅ Cleared points and active timeouts for ${targetUser.tag}.` });
+            await interaction.editReply({ content: `✅ Cleared points and active timeouts for ${targetUser.tag}.` });
+            return;
 
         } else if (commandName === 'mute') {
             const durationStr = interaction.options.getString('duration');
@@ -1069,33 +1139,43 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 return interaction.reply({ content: '❌ I cannot mute this user (missing permissions or user has higher role).', ephemeral: true });
             }
 
+            await interaction.deferReply({ ephemeral: false });
             await targetMember.timeout(durationMs, reason);
-            await interaction.reply({ content: `✅ Muted ${targetUser.tag} for ${durationStr}. Reason: ${reason}` });
+            await interaction.editReply({ content: `✅ Muted ${targetUser.tag} for ${durationStr}. Reason: ${reason}` });
+            return;
 
         } else if (commandName === 'unmute') {
             if (!targetMember.moderatable) {
                 return interaction.reply({ content: '❌ I cannot unmute this user.', ephemeral: true });
             }
+            await interaction.deferReply({ ephemeral: false });
             await targetMember.timeout(null, 'Unmuted by command');
-            await interaction.reply({ content: `✅ Unmuted ${targetUser.tag}.` });
+            await interaction.editReply({ content: `✅ Unmuted ${targetUser.tag}.` });
+            return;
 
         } else if (commandName === 'kick') {
             const reason = interaction.options.getString('reason');
             if (!targetMember.kickable) {
                 return interaction.reply({ content: '❌ I cannot kick this user.', ephemeral: true });
             }
+            await interaction.deferReply({ ephemeral: false });
             await targetMember.kick(reason);
-            await interaction.reply({ content: `✅ Kicked ${targetUser.tag}. Reason: ${reason}` });
+            await interaction.editReply({ content: `✅ Kicked ${targetUser.tag}. Reason: ${reason}` });
+            return;
 
         } else if (commandName === 'ban') {
             const reason = interaction.options.getString('reason');
             if (!targetMember.bannable) {
                 return interaction.reply({ content: '❌ I cannot ban this user.', ephemeral: true });
             }
+            await interaction.deferReply({ ephemeral: false });
             await targetMember.ban({ reason });
-            await interaction.reply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
+            await interaction.editReply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
+            return;
 
         } else if (commandName === 'verify') {
+            await interaction.deferReply({ ephemeral: false });
+
             const roleUnverified = getConfiguredRole(interaction.guild, 'roleUnverified');
             const roleVerified = getConfiguredRole(interaction.guild, 'roleVerified');
 
@@ -1104,7 +1184,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
             await logAction(interaction.guild, 'User Verified (Command)', `User <@${targetUser.id}> was manually verified by ${interaction.user.tag}.`, 'Green');
 
-            await interaction.reply({ content: `✅ Manually verified ${targetUser.tag}.` });
+            await interaction.editReply({ content: `✅ Manually verified ${targetUser.tag}.` });
+            return;
         }
 
     } catch (error) {

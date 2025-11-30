@@ -1,11 +1,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Warning } from '../types';
-import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History } from 'lucide-react';
+import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History, RefreshCw, Users, ShieldCheck, X, Loader2, Inbox } from 'lucide-react';
+
+const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted'; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'verified', label: 'Проверенные' },
+  { value: 'muted', label: 'Замьюченные' },
+];
+
+const RISK_FILTERS: { value: 'all' | 'low' | 'medium' | 'high'; label: string }[] = [
+  { value: 'all', label: 'Все уровни' },
+  { value: 'low', label: '< 10 pts' },
+  { value: 'medium', label: '10-19 pts' },
+  { value: 'high', label: '20+ pts' },
+];
 import axios from 'axios';
+
+type ActionType = 'warn' | 'clear' | 'verify' | 'guilds';
 
 interface Props {
   users: User[];
   refresh: () => void;
+  loading?: boolean;
 }
 
 interface Guild {
@@ -15,7 +31,7 @@ interface Guild {
     owner: boolean;
 }
 
-export const UsersList: React.FC<Props> = ({ users, refresh }) => {
+export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [warnReason, setWarnReason] = useState('');
   const [warnPoints, setWarnPoints] = useState(1);
@@ -23,6 +39,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const [viewGuildsUser, setViewGuildsUser] = useState<User | null>(null);
   const [userGuilds, setUserGuilds] = useState<Guild[]>([]);
   const [loadingGuilds, setLoadingGuilds] = useState(false);
+  const [guildsError, setGuildsError] = useState<string | null>(null);
 
   const [historyUser, setHistoryUser] = useState<User | null>(null);
   const [historyWarnings, setHistoryWarnings] = useState<Warning[] | null>(null);
@@ -32,6 +49,11 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
   
   const [presets, setPresets] = useState<{id: number, name: string, points: number}[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'muted'>('all');
+  const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<{ type: ActionType; userId?: string } | null>(null);
 
   useEffect(() => {
     if (selectedUser) {
@@ -39,9 +61,87 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
     }
   }, [selectedUser]);
 
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+
+  const stats = useMemo(() => {
+    const total = users.length;
+    const verified = users.filter(user => user.status === 'Verified').length;
+    const muted = users.filter(user => user.status === 'Muted').length;
+    const unverified = Math.max(0, total - verified);
+    const highRisk = users.filter(user => user.points >= 15).length;
+
+    return { total, verified, unverified, muted, highRisk };
+  }, [users]);
+
+  const riskMeta: Record<'low' | 'medium' | 'high', { label: string; badgeClass: string }> = {
+    low: { label: 'Низкий риск', badgeClass: 'bg-emerald-100 text-emerald-700' },
+    medium: { label: 'Нужен контроль', badgeClass: 'bg-amber-100 text-amber-700' },
+    high: { label: 'Критический риск', badgeClass: 'bg-rose-100 text-rose-700' },
+  };
+
+  const getRiskLevel = (points: number): 'low' | 'medium' | 'high' => {
+    if (points >= 20) return 'high';
+    if (points >= 10) return 'medium';
+    return 'low';
+  };
+
+  const hasActiveFilters = statusFilter !== 'all' || riskFilter !== 'all' || Boolean(searchTerm);
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setRiskFilter('all');
+    setSearchTerm('');
+  };
+
+  const triggerFeedback = (type: 'success' | 'error', message: string) => {
+    setFeedback({ type, message });
+  };
+
+  const setActionState = (type: ActionType, userId?: string) => {
+    setActionLoading({ type, userId });
+  };
+
+  const clearActionState = () => setActionLoading(null);
+
+  const isActionLoading = (type: ActionType, userId?: string) => {
+    if (!actionLoading) return false;
+    if (actionLoading.type !== type) return false;
+    if (!userId) return true;
+    return actionLoading.userId === userId;
+  };
+
+  const handleRefreshClick = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+      triggerFeedback('success', 'Список участников обновлён');
+    } catch (err) {
+      console.error(err);
+      triggerFeedback('error', 'Не удалось обновить список участников');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const renderRiskBadge = (points: number) => {
+    const level = getRiskLevel(points);
+    const meta = riskMeta[level];
+    return (
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.badgeClass}`}>
+        {meta.label}
+      </span>
+    );
+  };
+
   const handleWarn = async () => {
     if (!selectedUser) return;
+    setActionState('warn', selectedUser.id);
     try {
+      const warnTarget = selectedUser.username;
       await axios.post('/api/warn', {
         userId: selectedUser.id,
         points: warnPoints,
@@ -50,43 +150,58 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
       setSelectedUser(null);
       setWarnReason('');
       setWarnPoints(1);
-      refresh();
+      await refresh();
+      triggerFeedback('success', `Предупреждение отправлено: ${warnTarget}`);
     } catch (err) {
-      alert('Failed to warn user');
+      triggerFeedback('error', 'Не удалось выдать предупреждение');
+    } finally {
+      clearActionState();
     }
   };
 
   const handleClear = async (userId: string) => {
-    if (!confirm('Are you sure you want to clear all punishments?')) return;
+    if (!confirm('Сбросить все наказания для этого пользователя?')) return;
+    setActionState('clear', userId);
     try {
       await axios.post('/api/clear', { userId });
-      refresh();
+      await refresh();
+      triggerFeedback('success', 'Наказания очищены');
     } catch (err) {
-      alert('Failed to clear punishments');
+      triggerFeedback('error', 'Не удалось очистить наказания');
+    } finally {
+      clearActionState();
     }
   };
 
   const handleSendVerification = async (userId: string) => {
-    if (!confirm('Send verification QR code to this user via DM?')) return;
+    if (!confirm('Отправить пользователю новый QR-код в личные сообщения?')) return;
+    setActionState('verify', userId);
     try {
       await axios.post('/api/verify/send-dm', { userId });
-      alert('Verification DM sent!');
+      triggerFeedback('success', 'DM с QR-кодом отправлен');
     } catch (err) {
-      alert('Failed to send verification DM');
+      triggerFeedback('error', 'Не удалось отправить сообщение с QR-кодом');
+    } finally {
+      clearActionState();
     }
   };
 
   const handleViewGuilds = async (user: User) => {
       setViewGuildsUser(user);
       setLoadingGuilds(true);
+      setGuildsError(null);
+      setActionState('guilds', user.id);
       try {
           const res = await axios.get(`/api/user/${user.id}/guilds`);
           setUserGuilds(res.data);
       } catch (err) {
           console.error(err);
           setUserGuilds([]);
+          setGuildsError('Не удалось загрузить серверы пользователя');
+          triggerFeedback('error', 'Не удалось загрузить серверы пользователя');
       } finally {
           setLoadingGuilds(false);
+          clearActionState();
       }
   };
 
@@ -124,6 +239,18 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'verified') {
+        result = result.filter(user => user.status === 'Verified');
+      } else if (statusFilter === 'muted') {
+        result = result.filter(user => user.status === 'Muted');
+      }
+    }
+
+    if (riskFilter !== 'all') {
+      result = result.filter(user => getRiskLevel(user.points) === riskFilter);
+    }
+
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(user => 
@@ -144,7 +271,10 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
     }
 
     return result;
-  }, [users, searchTerm, sortConfig]);
+  }, [users, searchTerm, sortConfig, statusFilter, riskFilter]);
+
+  const showSkeleton = loading || refreshing;
+  const showEmptyState = !showSkeleton && filteredAndSortedUsers.length === 0;
 
   const getProgressColor = (points: number) => {
     if (points < 10) return 'bg-blue-500';
@@ -154,16 +284,134 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Search Bar */}
-      <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-        <Search className="text-gray-400" size={20} />
-        <input 
-          type="text"
-          placeholder="Search users by name or ID..."
-          className="flex-1 outline-none text-gray-700"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="p-4 border-b border-gray-100 space-y-4">
+        {feedback && (
+          <div className={`flex items-center gap-3 p-3 rounded-lg border text-sm font-medium ${
+            feedback.type === 'success'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+              : 'bg-rose-50 text-rose-700 border-rose-100'
+          }`}>
+            {feedback.type === 'success' ? <ShieldCheck size={18} /> : <AlertTriangle size={18} />}
+            <span>{feedback.message}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex items-center gap-3 flex-1 px-3 py-2 border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-blue-500">
+            <Search className="text-gray-400" size={18} />
+            <input 
+              type="text"
+              placeholder="Найдите пользователя по имени или ID"
+              className="flex-1 outline-none text-gray-700"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefreshClick}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {refreshing ? <Loader2 size={16} className="text-gray-500 animate-spin" /> : <RefreshCw size={16} className="text-gray-500" />}
+              {refreshing ? 'Обновляем...' : 'Обновить'}
+            </button>
+            <button
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <X size={16} />
+              Сбросить
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Users className="text-blue-600" size={20} />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-blue-600">Всего участников</p>
+                <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-green-50 border border-green-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <ShieldCheck className="text-green-600" size={20} />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-green-600">Проверенные</p>
+                <p className="text-2xl font-bold text-green-900">{stats.verified}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <AlertTriangle className="text-amber-600" size={20} />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-amber-600">Под наблюдением</p>
+                <p className="text-2xl font-bold text-amber-900">{stats.highRisk}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Server className="text-gray-600" size={20} />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Замьючены</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.muted}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Статус</p>
+            <div className="flex flex-wrap gap-2">
+              {STATUS_FILTERS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setStatusFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    statusFilter === option.value
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'text-gray-600 border-gray-200 hover:border-blue-400'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Риск</p>
+            <div className="flex flex-wrap gap-2">
+              {RISK_FILTERS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => setRiskFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    riskFilter === option.value
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'text-gray-600 border-gray-200 hover:border-amber-400'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -201,7 +449,35 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredAndSortedUsers.map(user => (
+            {showSkeleton && Array.from({ length: 5 }).map((_, idx) => (
+              <tr key={`skeleton-${idx}`} className="animate-pulse">
+                <td className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-200" />
+                    <div className="space-y-2 w-full">
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-2 bg-gray-100 rounded w-1/4" />
+                    </div>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="h-5 w-24 bg-gray-100 rounded-full" />
+                </td>
+                <td className="p-4">
+                  <div className="h-2 bg-gray-100 rounded-full" />
+                  <div className="h-2 bg-gray-100 rounded-full mt-3 w-1/2" />
+                </td>
+                <td className="p-4">
+                  <div className="flex gap-2">
+                    {[0,1,2,3,4].map(key => (
+                      <div key={key} className="w-9 h-9 bg-gray-100 rounded-lg" />
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {!showSkeleton && filteredAndSortedUsers.map(user => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                 <td className="p-4 flex items-center gap-3">
                   <img src={user.avatar} alt="" className="w-10 h-10 rounded-full" />
@@ -218,24 +494,31 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                   </span>
                 </td>
                 <td className="p-4 w-1/3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${getProgressColor(user.points)} transition-all duration-500`}
-                        style={{ width: `${Math.min(100, (user.points / 20) * 100)}%` }}
-                      />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${getProgressColor(user.points)} transition-all duration-500`}
+                          style={{ width: `${Math.min(100, (user.points / 20) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-sm text-gray-600 w-8 text-right font-semibold">{user.points}</span>
                     </div>
-                    <span className="text-sm text-gray-500 w-8">{user.points}</span>
+                    <div className="flex items-center justify-between">
+                      {renderRiskBadge(user.points)}
+                      <span className="text-xs text-gray-400">макс. 20</span>
+                    </div>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex gap-2">
                     <button 
                       onClick={() => handleViewGuilds(user)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      disabled={isActionLoading('guilds', user.id)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="View Servers"
                     >
-                      <Server size={18} />
+                      {isActionLoading('guilds', user.id) ? <Loader2 size={18} className="animate-spin" /> : <Server size={18} />}
                     </button>
                     <button 
                       onClick={() => openHistoryModal(user)}
@@ -246,10 +529,11 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                     </button>
                     <button 
                       onClick={() => handleSendVerification(user.id)}
-                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      disabled={isActionLoading('verify', user.id)}
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Send Verification QR"
                     >
-                      <QrCode size={18} />
+                      {isActionLoading('verify', user.id) ? <Loader2 size={18} className="animate-spin" /> : <QrCode size={18} />}
                     </button>
                     <button 
                       onClick={() => setSelectedUser(user)}
@@ -260,19 +544,30 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
                     </button>
                     <button 
                       onClick={() => handleClear(user.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={isActionLoading('clear', user.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Clear Punishments"
                     >
-                      <Trash2 size={18} />
+                      {isActionLoading('clear', user.id) ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                     </button>
                   </div>
                 </td>
               </tr>
             ))}
-            {filteredAndSortedUsers.length === 0 && (
+            {!showSkeleton && showEmptyState && (
               <tr>
                 <td colSpan={4} className="p-8 text-center text-gray-500">
-                  No users found matching "{searchTerm}"
+                  <div className="flex flex-col items-center gap-3">
+                    <Inbox size={32} className="text-gray-400" />
+                    <p className="font-medium">
+                      {hasActiveFilters ? 'Никто не подходит под выбранные фильтры.' : 'На сервере пока нет данных об участниках.'}
+                    </p>
+                    {hasActiveFilters ? (
+                      <p className="text-sm text-gray-400">Попробуйте сбросить фильтры или изменить запрос.</p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Нажмите «Обновить», чтобы запросить участников у бота.</p>
+                    )}
+                  </div>
                 </td>
               </tr>
             )}
@@ -282,9 +577,17 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
 
       {/* Warn Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-            <h3 className="text-xl font-bold mb-4">Warn {selectedUser.username}</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedUser(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Предупреждение</p>
+                <h3 className="text-xl font-bold">{selectedUser.username}</h3>
+              </div>
+              <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
             
             {presets.length > 0 && (
                 <div className="mb-4">
@@ -349,11 +652,13 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
 
       {/* History Modal */}
       {historyUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeHistoryModal}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">Warning History: {historyUser.username}</h3>
-              <button onClick={closeHistoryModal} className="text-gray-500 hover:text-gray-700">Close</button>
+              <button onClick={closeHistoryModal} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
             </div>
 
             {historyLoading ? (
@@ -384,18 +689,22 @@ export const UsersList: React.FC<Props> = ({ users, refresh }) => {
 
       {/* Guilds Modal */}
       {viewGuildsUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setViewGuildsUser(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold">Servers for {viewGuildsUser.username}</h3>
-                <button onClick={() => setViewGuildsUser(null)} className="text-gray-500 hover:text-gray-700">Close</button>
+                <button onClick={() => setViewGuildsUser(null)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
             </div>
             
-            {loadingGuilds ? (
-                <p>Loading...</p>
-            ) : userGuilds.length === 0 ? (
-                <p className="text-gray-500">No server data available (User might not be verified via OAuth yet).</p>
-            ) : (
+      {loadingGuilds ? (
+        <p>Loading...</p>
+      ) : guildsError ? (
+        <p className="text-red-500">{guildsError}</p>
+      ) : userGuilds.length === 0 ? (
+        <p className="text-gray-500">No server data available (User might not be verified via OAuth yet).</p>
+      ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {userGuilds.map(guild => (
                         <div key={guild.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg">
