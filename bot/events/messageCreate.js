@@ -23,10 +23,10 @@ module.exports = {
                     // React to the message to show it's being processed/flagged
                     await message.react('👀');
 
-                    if (analysis.severity >= 5) {
+                    if (analysis.severity >= 75) {
                         const replyContent = analysis.comment 
-                            ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/10)`
-                            : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/10`;
+                            ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
+                            : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
 
                         await message.reply({
                             content: replyContent,

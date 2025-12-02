@@ -49,7 +49,7 @@ async function analyzeText(text) {
         { 
             "violation": boolean, 
             "reason": "string (краткая причина нарушения на русском)", 
-            "severity": number (1-10),
+            "severity": number (1-100),
             "comment": "string (Твой комментарий как Lusty Xeno: строгий, но харизматичный, на русском языке. Обращайся к нарушителю)" 
         }`;
         
