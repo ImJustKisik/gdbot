@@ -4,11 +4,16 @@ const { GENAI_API_KEYS } = require('./config');
 // Initialize models for all keys
 const models = [];
 if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
-    GENAI_API_KEYS.forEach(key => {
+    GENAI_API_KEYS.forEach((key, index) => {
         try {
             const genAI = new GoogleGenerativeAI(key);
             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-            models.push(model);
+            models.push({
+                instance: model,
+                keyMask: `...${key.slice(-4)}`,
+                usage: 0,
+                id: index + 1
+            });
         } catch (e) {
             console.error(`Failed to initialize AI model with key ending in ...${key.slice(-4)}:`, e.message);
         }
@@ -20,17 +25,23 @@ let currentKeyIndex = 0;
 
 function getNextModel() {
     if (models.length === 0) return null;
-    const model = models[currentKeyIndex];
+    const wrapper = models[currentKeyIndex];
+    wrapper.usage++;
     currentKeyIndex = (currentKeyIndex + 1) % models.length;
-    return model;
+    return wrapper;
 }
 
 async function analyzeText(text) {
-    const model = getNextModel();
-    if (!model) {
+    const wrapper = getNextModel();
+    if (!wrapper) {
         console.error("AI Error: No models initialized. Check API_KEYS.");
         return null;
     }
+
+    // Log usage stats
+    console.log(`[AI LB] Key ${wrapper.id} (${wrapper.keyMask}) | Usage: ${wrapper.usage}`);
+    const model = wrapper.instance;
+
     try {
         const rules = `1. Уважение: запрещены оскорбления, травля, угрозы, дискриминация.
 2. Нет токсичности: запрещены агрессия, троллинг, провокации.
