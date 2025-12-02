@@ -98,6 +98,14 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
    - ДА -> Violation: TRUE.
    - НЕТ (просто крик души или мем) -> Violation: FALSE.
 
+ПРИМЕРЫ РЕШЕНИЙ (FEW-SHOT LEARNING):
+- "СБ сосатб" -> { violation: false, severity: 10, reason: "Игровой сленг/мем" }
+- "Код от арсенала 1234" -> { violation: true, severity: 70, reason: "Правило 2.2: Метагейминг (код)" }
+- "Слава [Стране]!" -> { violation: true, severity: 100, reason: "Правило 4.1: Политика" }
+- "@User ты ничтожество, удали игру" -> { violation: true, severity: 65, reason: "Правило 3: Прямое оскорбление" }
+- "Ну ты и бот конечно" (в ответ на фейл в игре) -> { violation: false, severity: 20, reason: "Дружеский подкол" }
+- "Админы дауны" -> { violation: true, severity: 60, reason: "Правило 3.2: Неуважение к администрации" }
+
 ПРАВИЛА СЕРВЕРА:
 ${rules}
 
