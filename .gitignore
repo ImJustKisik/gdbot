@@ -9,6 +9,10 @@ client/node_modules/
 
 # Database
 database.json
+database.json.bak
+database.sqlite
+*.sqlite
+*.db
 
 # Build outputs
 client/dist/
