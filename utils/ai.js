@@ -4,7 +4,7 @@ const { GENAI_API_KEY } = require('./config');
 let genAIModel = null;
 if (GENAI_API_KEY) {
     const genAI = new GoogleGenerativeAI(GENAI_API_KEY);
-    genAIModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-preview-02-05" });
+    genAIModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 }
 
 async function analyzeText(text) {
