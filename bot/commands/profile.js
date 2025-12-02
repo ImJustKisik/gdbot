@@ -8,7 +8,7 @@ module.exports = {
         .addUserOption(option => option.setName('user').setDescription('The user to view').setRequired(true)),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
 
         const targetUser = interaction.options.getUser('user');
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);

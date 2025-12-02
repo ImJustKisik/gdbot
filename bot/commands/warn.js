@@ -7,16 +7,45 @@ module.exports = {
         .setName('warn')
         .setDescription('Warn a user')
         .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
-        .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true))
-        .addIntegerOption(option => option.setName('points').setDescription('Points to add (default 1)').setMinValue(1).setMaxValue(20)),
+        .addStringOption(option => option.setName('preset').setDescription('Select a preset reason').setAutocomplete(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for warning (overrides preset name)'))
+        .addIntegerOption(option => option.setName('points').setDescription('Points to add (overrides preset points)').setMinValue(1).setMaxValue(20)),
+
+    async autocomplete(interaction) {
+        const focusedValue = interaction.options.getFocused();
+        const presets = db.getPresets();
+        const filtered = presets.filter(preset => preset.name.toLowerCase().includes(focusedValue.toLowerCase()));
+        
+        await interaction.respond(
+            filtered.slice(0, 25).map(preset => ({ name: `${preset.name} (${preset.points} pts)`, value: preset.id.toString() }))
+        );
+    },
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
 
         const targetUser = interaction.options.getUser('user');
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        const reason = interaction.options.getString('reason');
-        const points = interaction.options.getInteger('points') || 1;
+        
+        const presetId = interaction.options.getString('preset');
+        let reason = interaction.options.getString('reason');
+        let points = interaction.options.getInteger('points');
+
+        // Resolve Preset
+        if (presetId) {
+            const presets = db.getPresets();
+            const preset = presets.find(p => p.id.toString() === presetId);
+            if (preset) {
+                if (!reason) reason = preset.name;
+                if (!points) points = preset.points;
+            }
+        }
+
+        // Validation
+        if (!reason) {
+            return interaction.editReply({ content: '❌ You must provide a reason or select a valid preset.' });
+        }
+        if (!points) points = 1;
 
         if (!targetMember) {
             return interaction.editReply({ content: 'User not found in this server.' });

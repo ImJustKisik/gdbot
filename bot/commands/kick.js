@@ -19,7 +19,7 @@ module.exports = {
         if (!targetMember.kickable) {
             return interaction.reply({ content: '❌ I cannot kick this user.', ephemeral: true });
         }
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
         await targetMember.kick(reason);
         await interaction.editReply({ content: `✅ Kicked ${targetUser.tag}. Reason: ${reason}` });
     }

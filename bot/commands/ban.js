@@ -19,7 +19,7 @@ module.exports = {
         if (!targetMember.bannable) {
             return interaction.reply({ content: '❌ I cannot ban this user.', ephemeral: true });
         }
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
         await targetMember.ban({ reason });
         await interaction.editReply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
     }

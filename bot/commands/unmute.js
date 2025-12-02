@@ -17,7 +17,7 @@ module.exports = {
         if (!targetMember.moderatable) {
             return interaction.reply({ content: '❌ I cannot unmute this user.', ephemeral: true });
         }
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
         await targetMember.timeout(null, 'Unmuted by command');
         await interaction.editReply({ content: `✅ Unmuted ${targetUser.tag}.` });
     }

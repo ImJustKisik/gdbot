@@ -34,7 +34,7 @@ module.exports = {
             return interaction.reply({ content: '❌ I cannot mute this user (missing permissions or user has higher role).', ephemeral: true });
         }
 
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
         await targetMember.timeout(durationMs, reason);
         await interaction.editReply({ content: `✅ Muted ${targetUser.tag} for ${durationStr}. Reason: ${reason}` });
     }
