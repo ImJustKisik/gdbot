@@ -9,8 +9,8 @@ module.exports = {
 
         const user = db.getUser(message.author.id);
         
-        // DEBUG LOGGING
-        // console.log(`[Monitor] Msg from ${message.author.tag} (${message.author.id}). Monitored: ${user?.isMonitored}`);
+        // DEBUG LOGGING - Force enable to see if event fires
+        console.log(`[Monitor Debug] Msg from ${message.author.tag}. Monitored: ${user?.isMonitored}`);
 
         // Check if user is under observation
         if (user && user.isMonitored) {
