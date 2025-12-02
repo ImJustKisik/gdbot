@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
+const axios = require('axios');
 const db = require('../../db');
-const { analyzeText } = require('../../utils/ai');
+const { analyzeContent } = require('../../utils/ai');
 
 module.exports = {
     name: Events.MessageCreate,
@@ -14,9 +15,28 @@ module.exports = {
 
         // Check if user is under observation
         if (user && user.isMonitored) {
-            console.log(`[Monitor] Analyzing message from ${message.author.tag}: "${message.content}"`);
+            let imageBuffer = null;
+            let mimeType = null;
+
+            // Check for images
+            const imageAttachment = message.attachments.find(a => a.contentType && a.contentType.startsWith('image/'));
+            if (imageAttachment) {
+                try {
+                    console.log(`[Monitor] Downloading image: ${imageAttachment.url}`);
+                    const response = await axios.get(imageAttachment.url, { responseType: 'arraybuffer' });
+                    imageBuffer = Buffer.from(response.data);
+                    mimeType = imageAttachment.contentType;
+                } catch (e) {
+                    console.error("Failed to download image", e);
+                }
+            }
+
+            if (!message.content && !imageBuffer) return; // Nothing to analyze
+
+            console.log(`[Monitor] Analyzing content from ${message.author.tag}. Text: "${message.content}", Image: ${!!imageBuffer}`);
+            
             try {
-                const analysis = await analyzeText(message.content);
+                const analysis = await analyzeContent(message.content, imageBuffer, mimeType);
                 console.log(`[Monitor] AI Result:`, analysis);
                 
                 if (analysis && analysis.violation) {

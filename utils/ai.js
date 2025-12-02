@@ -31,7 +31,7 @@ function getNextModel() {
     return wrapper;
 }
 
-async function analyzeText(text) {
+async function analyzeContent(text, imageBuffer = null, mimeType = null) {
     const wrapper = getNextModel();
     if (!wrapper) {
         console.error("AI Error: No models initialized. Check API_KEYS.");
@@ -46,11 +46,11 @@ async function analyzeText(text) {
         const rules = `1. Уважение: запрещены оскорбления, травля, угрозы, дискриминация.
 2. Нет токсичности: запрещены агрессия, троллинг, провокации.
 3. Приватность: запрещен слив личных данных.
-4. NSFW: запрещен контент 18+.
+4. NSFW: запрещен контент 18+ (порнография, гуро, жестокость).
 5. Спам/Флуд: запрещены.
 6. Реклама: запрещена.`;
 
-        const prompt = `Ты — Lusty Xeno, ИИ-страж Discord сервера. Твоя задача — выявлять нарушения правил и TOS Discord.
+        const promptText = `Ты — Lusty Xeno, ИИ-страж Discord сервера. Твоя задача — выявлять нарушения правил и TOS Discord в тексте и изображениях.
 
         ВАЖНЫЕ ИНСТРУКЦИИ ПО КОНТЕКСТУ:
         - Игровой сленг (убил, сдох, нуб, рак, бот, лох в контексте игры) -> НЕ является нарушением или имеет низкий severity (10-30).
@@ -62,13 +62,14 @@ async function analyzeText(text) {
         - Hate Speech (расизм, гомофобия, сексизм).
         - Прямые угрозы жизни/здоровью.
         - Слив личных данных (Doxing).
-        - NSFW/Порнография.
+        - NSFW/Порнография/Hentai/Gore (на изображениях).
         - Жесткие прямые оскорбления личности с целью унизить.
 
         Правила сервера:
         ${rules}
         
-        Проанализируй текст: "${text}"
+        Проанализируй контент. Текст: "${text || '[Нет текста]'}"
+        ${imageBuffer ? '[Приложено изображение для анализа]' : ''}
         
         Ответь ТОЛЬКО JSON объектом:
         { 
@@ -78,7 +79,17 @@ async function analyzeText(text) {
             "comment": "string (Твой комментарий как Lusty Xeno: строгий, но харизматичный, на русском языке. Если severity < 75, оставь пустым)" 
         }`;
         
-        const result = await model.generateContent(prompt);
+        const parts = [promptText];
+        if (imageBuffer && mimeType) {
+            parts.push({
+                inlineData: {
+                    data: imageBuffer.toString('base64'),
+                    mimeType: mimeType
+                }
+            });
+        }
+
+        const result = await model.generateContent(parts);
         const response = await result.response;
         const textResponse = response.text().replace(/```json|```/g, '').trim();
         return JSON.parse(textResponse);
@@ -87,12 +98,12 @@ async function analyzeText(text) {
         // Simple retry logic: if one key fails, try the next one immediately
         if (models.length > 1) {
             console.log("Retrying with next API key...");
-            return analyzeText(text); // Recursive retry (be careful with infinite loops, but here it's limited by stack)
+            return analyzeContent(text, imageBuffer, mimeType); 
         }
         return null;
     }
 }
 
 module.exports = {
-    analyzeText
+    analyzeContent
 };
