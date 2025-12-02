@@ -35,7 +35,7 @@ module.exports = {
         const response = await interaction.reply({
             content: `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`,
             components: [row],
-            fetchReply: true
+            withResponse: true
         });
 
         const collector = response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15000 });
