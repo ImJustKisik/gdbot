@@ -4,7 +4,8 @@ const crypto = require('crypto');
 // DEBUG: Check if API_KEY is loaded
 console.log("---------------------------------------------------");
 if (process.env.API_KEY) {
-    console.log(`DEBUG: API_KEY loaded successfully. Length: ${process.env.API_KEY.length}`);
+    const keys = process.env.API_KEY.split(',');
+    console.log(`DEBUG: API_KEY loaded successfully. Found ${keys.length} key(s).`);
 } else {
     console.error('DEBUG: API_KEY is MISSING in process.env. Please check your .env file.');
 }
@@ -27,7 +28,7 @@ if (!SESSION_SECRET) {
 module.exports = {
     PORT,
     GUILD_ID: process.env.GUILD_ID,
-    GENAI_API_KEY: process.env.API_KEY,
+    GENAI_API_KEYS: process.env.API_KEY ? process.env.API_KEY.split(',').map(k => k.trim()) : [],
     CLIENT_ID: process.env.CLIENT_ID,
     CLIENT_SECRET: process.env.CLIENT_SECRET,
     REDIRECT_URI: process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`,
