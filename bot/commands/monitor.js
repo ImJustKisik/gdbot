@@ -18,6 +18,9 @@ module.exports = {
             return interaction.reply({ content: `✅ AI Monitoring for ${targetUser} has been **disabled**.` });
         }
 
+        // Defer reply to prevent "Unknown interaction" timeout
+        await interaction.deferReply();
+
         // If enabling, ask for confirmation
         const confirmButton = new ButtonBuilder()
             .setCustomId('confirm_monitor')
@@ -32,12 +35,11 @@ module.exports = {
         const row = new ActionRowBuilder()
             .addComponents(confirmButton, cancelButton);
 
-        await interaction.reply({
+        const response = await interaction.editReply({
             content: `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`,
             components: [row]
         });
 
-        const response = await interaction.fetchReply();
         const collector = response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15000 });
 
         collector.on('collect', async i => {
