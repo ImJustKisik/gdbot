@@ -8,7 +8,10 @@ if (GENAI_API_KEY) {
 }
 
 async function analyzeText(text) {
-    if (!genAIModel) return null;
+    if (!genAIModel) {
+        console.error("AI Error: Model not initialized. Check API_KEY.");
+        return null;
+    }
     try {
         const prompt = `Analyze the following text for toxicity, insults, or rule violations. 
         Respond ONLY with a JSON object in this format: { "violation": boolean, "reason": "string", "severity": number (1-10) }. 

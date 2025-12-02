@@ -9,10 +9,15 @@ module.exports = {
 
         const user = db.getUser(message.author.id);
         
+        // DEBUG LOGGING
+        // console.log(`[Monitor] Msg from ${message.author.tag} (${message.author.id}). Monitored: ${user?.isMonitored}`);
+
         // Check if user is under observation
         if (user && user.isMonitored) {
+            console.log(`[Monitor] Analyzing message from ${message.author.tag}: "${message.content}"`);
             try {
                 const analysis = await analyzeText(message.content);
+                console.log(`[Monitor] AI Result:`, analysis);
                 
                 if (analysis && analysis.violation) {
                     // React to the message to show it's being processed/flagged
