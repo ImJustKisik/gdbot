@@ -1,11 +1,20 @@
-const { Events, REST, Routes } = require('discord.js');
+const { Events, REST, Routes, Collection } = require('discord.js');
 const client = require('./client');
-const commands = require('./commands');
+const commandModules = require('./commands');
 const handleInteraction = require('./events/interactionCreate');
 const handleGuildMemberAdd = require('./events/guildMemberAdd');
 const { DISCORD_BOT_TOKEN, CLIENT_ID, GUILD_ID } = require('../utils/config');
 
 async function startBot() {
+    // Initialize commands collection
+    client.commands = new Collection();
+    const commandsData = [];
+
+    for (const module of commandModules) {
+        client.commands.set(module.data.name, module);
+        commandsData.push(module.data.toJSON());
+    }
+
     client.once('ready', async () => {
         console.log(`Discord Bot logged in as ${client.user.tag}`);
         
@@ -13,7 +22,7 @@ async function startBot() {
         const rest = new REST({ version: '10' }).setToken(DISCORD_BOT_TOKEN);
         try {
             console.log('Started refreshing application (/) commands.');
-            await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
+            await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commandsData });
             console.log('Successfully reloaded application (/) commands.');
         } catch (error) {
             console.error(error);
