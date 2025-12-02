@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
-const { PORT, SESSION_SECRET } = require('./utils/config');
+const { PORT, SESSION_SECRET, REDIRECT_URI } = require('./utils/config');
 const { startBot, client } = require('./bot'); // Imports from bot/index.js
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
@@ -21,7 +21,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // true in production (requires HTTPS)
+        secure: REDIRECT_URI.startsWith('https'), // Only use secure cookies if using HTTPS
         maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
     }
 }));
