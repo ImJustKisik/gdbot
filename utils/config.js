@@ -1,13 +1,16 @@
 require('dotenv').config();
 const crypto = require('crypto');
 
+// Parse API Keys (support single API_KEY or comma-separated API_KEYS)
+const rawKeys = process.env.API_KEYS || process.env.API_KEY || "";
+const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+
 // DEBUG: Check if API_KEY is loaded
 console.log("---------------------------------------------------");
-if (process.env.API_KEY) {
-    const keys = process.env.API_KEY.split(',');
-    console.log(`DEBUG: API_KEY loaded successfully. Found ${keys.length} key(s).`);
+if (apiKeys.length > 0) {
+    console.log(`DEBUG: ${apiKeys.length} API Key(s) loaded successfully.`);
 } else {
-    console.error('DEBUG: API_KEY is MISSING in process.env. Please check your .env file.');
+    console.error('DEBUG: API_KEY or API_KEYS is MISSING in process.env. Please check your .env file.');
 }
 console.log("---------------------------------------------------");
 
@@ -28,7 +31,7 @@ if (!SESSION_SECRET) {
 module.exports = {
     PORT,
     GUILD_ID: process.env.GUILD_ID,
-    GENAI_API_KEYS: process.env.API_KEY ? process.env.API_KEY.split(',').map(k => k.trim()) : [],
+    GENAI_API_KEYS: apiKeys, // Export array of keys
     CLIENT_ID: process.env.CLIENT_ID,
     CLIENT_SECRET: process.env.CLIENT_SECRET,
     REDIRECT_URI: process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`,
