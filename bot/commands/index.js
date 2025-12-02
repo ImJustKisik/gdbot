@@ -6,6 +6,7 @@ const unmute = require('./unmute');
 const kick = require('./kick');
 const ban = require('./ban');
 const verify = require('./verify');
+const monitor = require('./monitor');
 
 module.exports = [
     warn,
@@ -15,5 +16,6 @@ module.exports = [
     unmute,
     kick,
     ban,
-    verify
+    verify,
+    monitor
 ];

@@ -10,10 +10,15 @@ if (GENAI_API_KEY) {
 async function analyzeText(text) {
     if (!genAIModel) return null;
     try {
-        const prompt = `Analyze the following text for toxicity or rule violations. If it's a violation, suggest a severity score from 1 to 10. Text: "${text}"`;
+        const prompt = `Analyze the following text for toxicity, insults, or rule violations. 
+        Respond ONLY with a JSON object in this format: { "violation": boolean, "reason": "string", "severity": number (1-10) }. 
+        Do not include Markdown formatting.
+        Text: "${text}"`;
+        
         const result = await genAIModel.generateContent(prompt);
         const response = await result.response;
-        return response.text();
+        const textResponse = response.text().replace(/```json|```/g, '').trim();
+        return JSON.parse(textResponse);
     } catch (error) {
         console.error("AI Error:", error);
         return null;

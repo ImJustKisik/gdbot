@@ -3,6 +3,7 @@ const client = require('./client');
 const commandModules = require('./commands');
 const handleInteraction = require('./events/interactionCreate');
 const handleGuildMemberAdd = require('./events/guildMemberAdd');
+const handleMessageCreate = require('./events/messageCreate');
 const { DISCORD_BOT_TOKEN, CLIENT_ID, GUILD_ID } = require('../utils/config');
 
 async function startBot() {
@@ -43,6 +44,7 @@ async function startBot() {
 
     client.on(Events.GuildMemberAdd, handleGuildMemberAdd);
     client.on(Events.InteractionCreate, handleInteraction);
+    client.on(Events.MessageCreate, handleMessageCreate.execute);
 
     // DEBUG: Check token before login
     console.log("---------------------------------------------------");

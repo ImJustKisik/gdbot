@@ -64,6 +64,7 @@ router.get('/users', requireAuth, async (req, res) => {
                 username: member.user.username,
                 avatar: member.user.displayAvatarURL(),
                 points: localUser.points || 0,
+                isMonitored: localUser.isMonitored || false,
                 warningsCount: localUser.warningsCount || 0,
                 warnings: [],
                 status: status

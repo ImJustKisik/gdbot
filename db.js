@@ -69,6 +69,18 @@ try {
     console.error("Migration check failed:", e);
 }
 
+// 0.1 Add 'is_monitored' column to users_v2 if missing
+try {
+    const tableInfo = db.prepare("PRAGMA table_info(users_v2)").all();
+    const hasMonitored = tableInfo.some(col => col.name === 'is_monitored');
+    if (!hasMonitored && tableInfo.length > 0) {
+        console.log("Migrating users_v2 table: Adding 'is_monitored' column...");
+        db.exec("ALTER TABLE users_v2 ADD COLUMN is_monitored INTEGER DEFAULT 0");
+    }
+} catch (e) {
+    console.error("Migration check failed:", e);
+}
+
 // 1. JSON to SQLite Blob (Legacy)
 function migrateFromJson() {
     if (fs.existsSync(jsonPath)) {
@@ -186,13 +198,14 @@ module.exports = {
     
     // Get full user object (Composite) - For backward compatibility and full profile view
     getUser: (userId) => {
-        const user = db.prepare('SELECT points FROM users_v2 WHERE id = ?').get(userId);
+        const user = db.prepare('SELECT points, is_monitored FROM users_v2 WHERE id = ?').get(userId);
         const warnings = db.prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY date DESC').all(userId);
         const oauth = db.prepare('SELECT * FROM user_oauth WHERE user_id = ?').get(userId);
 
         return {
             id: userId,
             points: user ? user.points : 0,
+            isMonitored: user ? !!user.is_monitored : false,
             warnings: warnings || [],
             oauth: oauth ? {
                 accessToken: oauth.access_token,
@@ -203,10 +216,19 @@ module.exports = {
         };
     },
 
+    setMonitored: (userId, isMonitored) => {
+        const val = isMonitored ? 1 : 0;
+        const transaction = db.transaction(() => {
+            db.prepare('INSERT OR IGNORE INTO users_v2 (id, points, is_monitored) VALUES (?, 0, ?)').run(userId, val);
+            db.prepare('UPDATE users_v2 SET is_monitored = ? WHERE id = ?').run(val, userId);
+        });
+        transaction();
+    },
+
     // Optimized summary for lists (Dashboard)
     getUsersSummary: () => {
         const rows = db.prepare(`
-            SELECT u.id, u.points, COALESCE(w.warning_count, 0) AS warningsCount
+            SELECT u.id, u.points, u.is_monitored, COALESCE(w.warning_count, 0) AS warningsCount
             FROM users_v2 u
             LEFT JOIN (
                 SELECT user_id, COUNT(*) AS warning_count
@@ -219,6 +241,7 @@ module.exports = {
         for (const row of rows) {
             result[row.id] = {
                 points: row.points,
+                isMonitored: !!row.is_monitored,
                 warningsCount: row.warningsCount
             };
         }
