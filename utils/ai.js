@@ -7,7 +7,7 @@ if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
     GENAI_API_KEYS.forEach(key => {
         try {
             const genAI = new GoogleGenerativeAI(key);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
             models.push(model);
         } catch (e) {
             console.error(`Failed to initialize AI model with key ending in ...${key.slice(-4)}:`, e.message);
