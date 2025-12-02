@@ -32,12 +32,12 @@ module.exports = {
         const row = new ActionRowBuilder()
             .addComponents(confirmButton, cancelButton);
 
-        const response = await interaction.reply({
+        await interaction.reply({
             content: `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`,
-            components: [row],
-            withResponse: true
+            components: [row]
         });
 
+        const response = await interaction.fetchReply();
         const collector = response.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15000 });
 
         collector.on('collect', async i => {
