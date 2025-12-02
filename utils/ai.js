@@ -32,10 +32,26 @@ async function analyzeText(text) {
         return null;
     }
     try {
-        const prompt = `Analyze the following text for toxicity, insults, or rule violations. 
-        Respond ONLY with a JSON object in this format: { "violation": boolean, "reason": "string", "severity": number (1-10) }. 
-        Do not include Markdown formatting.
-        Text: "${text}"`;
+        const rules = `1. Уважение: запрещены оскорбления, травля, угрозы, дискриминация.
+2. Нет токсичности: запрещены агрессия, троллинг, провокации.
+3. Приватность: запрещен слив личных данных.
+4. NSFW: запрещен контент 18+.
+5. Спам/Флуд: запрещены.
+6. Реклама: запрещена.`;
+
+        const prompt = `Ты — Lusty Xeno, ИИ-страж этого сервера. Твоя задача — анализировать сообщения на нарушения правил.
+        Правила сервера:
+        ${rules}
+        
+        Проанализируй текст: "${text}"
+        
+        Ответь ТОЛЬКО JSON объектом:
+        { 
+            "violation": boolean, 
+            "reason": "string (краткая причина нарушения на русском)", 
+            "severity": number (1-10),
+            "comment": "string (Твой комментарий как Lusty Xeno: строгий, но харизматичный, на русском языке. Обращайся к нарушителю)" 
+        }`;
         
         const result = await model.generateContent(prompt);
         const response = await result.response;

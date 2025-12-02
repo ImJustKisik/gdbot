@@ -24,8 +24,12 @@ module.exports = {
                     await message.react('👀');
 
                     if (analysis.severity >= 5) {
+                        const replyContent = analysis.comment 
+                            ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/10)`
+                            : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/10`;
+
                         await message.reply({
-                            content: `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/10`,
+                            content: replyContent,
                             allowedMentions: { repliedUser: true }
                         });
                     }
