@@ -50,7 +50,7 @@ async function init() {
         // Wait for the client to be fully ready before accepting requests
         if (!client.isReady()) {
             console.log('Waiting for client to be ready...');
-            await new Promise(resolve => client.once('ready', resolve));
+            await new Promise(resolve => client.once('clientReady', resolve));
         }
 
         app.listen(PORT, () => {

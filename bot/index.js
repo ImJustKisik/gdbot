@@ -15,7 +15,7 @@ async function startBot() {
         commandsData.push(module.data.toJSON());
     }
 
-    client.once('ready', async () => {
+    client.once(Events.ClientReady, async () => {
         console.log(`Discord Bot logged in as ${client.user.tag}`);
         
         // Register Slash Commands
