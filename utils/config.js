@@ -1,15 +1,25 @@
 require('dotenv').config();
 const crypto = require('crypto');
 
+// DEBUG: Check if API_KEY is loaded
+console.log("---------------------------------------------------");
+if (process.env.API_KEY) {
+    console.log(`DEBUG: API_KEY loaded successfully. Length: ${process.env.API_KEY.length}`);
+} else {
+    console.error('DEBUG: API_KEY is MISSING in process.env. Please check your .env file.');
+}
+console.log("---------------------------------------------------");
+
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 let SESSION_SECRET = process.env.SESSION_SECRET;
 
 if (!SESSION_SECRET) {
-    SESSION_SECRET = crypto.randomBytes(32).toString('hex');
     if (NODE_ENV === 'production') {
-        console.warn('WARNING: SESSION_SECRET environment variable is not set. Using a generated temporary secret. Sessions will be invalidated on restart.');
+        console.error('FATAL: SESSION_SECRET environment variable is required.');
+        process.exit(1);
     } else {
+        SESSION_SECRET = crypto.randomBytes(32).toString('hex');
         console.warn('SESSION_SECRET не задан. Сгенерирован временный секрет для локальной разработки.');
     }
 }
