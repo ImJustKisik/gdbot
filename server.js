@@ -11,6 +11,7 @@ const apiRoutes = require('./routes/api');
 const app = express();
 
 // --- Middleware ---
+app.set('trust proxy', 1); // Trust Nginx proxy (required for secure cookies behind proxy)
 app.use(cors());
 app.use(express.json());
 
