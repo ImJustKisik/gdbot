@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Discord bot with QR verification and warn system",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.6.0"
+  },
   "scripts": {
     "start": "node server.js",
     "build": "cd client && npm install && npm run build",

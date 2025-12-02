@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, AlertTriangle, Settings as SettingsIcon, Shield, List } from 'lucide-react';
 
 interface Settings {
     logChannelId: string;
@@ -54,6 +54,8 @@ export const SettingsView: React.FC = () => {
     const [channels, setChannels] = useState<SelectOption[]>([]);
     const [roles, setRoles] = useState<SelectOption[]>([]);
     
+    const [activeTab, setActiveTab] = useState<'general' | 'automod' | 'presets'>('general');
+
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetPoints, setNewPresetPoints] = useState(1);
 
@@ -109,6 +111,7 @@ export const SettingsView: React.FC = () => {
                 setSettings(response.data.settings);
             }
             setFeedback({ type: 'success', message: 'Настройки сохранены.' });
+            setTimeout(() => setFeedback(null), 3000);
         } catch (error: any) {
             const msg = error.response?.data?.error || error.message || 'Не удалось сохранить настройки';
             setFeedback({ type: 'error', message: msg });
@@ -195,9 +198,9 @@ export const SettingsView: React.FC = () => {
     }
 
     return (
-        <div className="space-y-8 max-w-4xl mx-auto">
+        <div className="space-y-6 max-w-4xl mx-auto">
             {feedback && (
-                <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'} transition-all`}>
                     {feedback.message}
                 </div>
             )}
@@ -212,266 +215,338 @@ export const SettingsView: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {/* Tabs Navigation */}
+            <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                <button
+                    onClick={() => setActiveTab('general')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'general' 
+                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <SettingsIcon size={18} />
+                    General
+                </button>
+                <button
+                    onClick={() => setActiveTab('automod')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'automod' 
+                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <Shield size={18} />
+                    Automod
+                </button>
+                <button
+                    onClick={() => setActiveTab('presets')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'presets' 
+                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <List size={18} />
+                    Presets
+                </button>
+            </div>
             
             {/* General Settings */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold mb-6 text-gray-800">General Configuration</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Log Channel ID</label>
-                        <input 
-                            type="text" 
-                            list="log-channel-options"
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.logChannelId || ''}
-                            onChange={e => setSettings({...settings, logChannelId: e.target.value})}
-                            placeholder="Channel ID for logs"
-                        />
-                        <datalist id="log-channel-options">
-                            {channels.map(channel => (
-                                <option key={channel.id} value={channel.id} label={`#${channel.name}`} />
-                            ))}
-                        </datalist>
-                        <p className="text-xs text-gray-500 mt-1">Текущий: {getChannelDisplay(settings.logChannelId)}</p>
+            {activeTab === 'general' && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800">General Configuration</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Log Channel</label>
+                            <input 
+                                type="text" 
+                                list="log-channel-options"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                value={settings.logChannelId || ''}
+                                onChange={e => setSettings({...settings, logChannelId: e.target.value})}
+                                placeholder="Search or enter ID..."
+                            />
+                            <datalist id="log-channel-options">
+                                {channels.map(channel => (
+                                    <option key={channel.id} value={channel.id} label={`#${channel.name}`} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel</label>
+                            <input 
+                                type="text" 
+                                list="verification-channel-options"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                value={settings.verificationChannelId || ''}
+                                onChange={e => setSettings({...settings, verificationChannelId: e.target.value})}
+                                placeholder="Search or enter ID..."
+                            />
+                            <datalist id="verification-channel-options">
+                                {channels.map(channel => (
+                                    <option key={`${channel.id}-verify`} value={channel.id} label={`#${channel.name}`} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.verificationChannelId)}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Unverified Role</label>
+                            <input 
+                                type="text" 
+                                list="role-unverified-options"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                value={settings.roleUnverified || ''}
+                                onChange={e => setSettings({...settings, roleUnverified: e.target.value})}
+                                placeholder="Search or enter ID..."
+                            />
+                            <datalist id="role-unverified-options">
+                                {roles.map(role => (
+                                    <option key={`${role.id}-unverified`} value={role.id} label={role.name} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleUnverified)}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Verified Role</label>
+                            <input 
+                                type="text" 
+                                list="role-verified-options"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                value={settings.roleVerified || ''}
+                                onChange={e => setSettings({...settings, roleVerified: e.target.value})}
+                                placeholder="Search or enter ID..."
+                            />
+                            <datalist id="role-verified-options">
+                                {roles.map(role => (
+                                    <option key={`${role.id}-verified`} value={role.id} label={role.name} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleVerified)}</p>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel ID</label>
-                        <input 
-                            type="text" 
-                            list="verification-channel-options"
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.verificationChannelId || ''}
-                            onChange={e => setSettings({...settings, verificationChannelId: e.target.value})}
-                            placeholder="Channel ID for fallback messages"
-                        />
-                        <datalist id="verification-channel-options">
-                            {channels.map(channel => (
-                                <option key={`${channel.id}-verify`} value={channel.id} label={`#${channel.name}`} />
-                            ))}
-                        </datalist>
-                        <p className="text-xs text-gray-500 mt-1">Текущий: {getChannelDisplay(settings.verificationChannelId)}</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Unverified Role Name</label>
-                        <input 
-                            type="text" 
-                            list="role-unverified-options"
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.roleUnverified || ''}
-                            onChange={e => setSettings({...settings, roleUnverified: e.target.value})}
-                        />
-                        <datalist id="role-unverified-options">
-                            {roles.map(role => (
-                                <option key={`${role.id}-unverified`} value={role.id} label={role.name} />
-                            ))}
-                        </datalist>
-                        <p className="text-xs text-gray-500 mt-1">Текущая роль: {getRoleDisplay(settings.roleUnverified)}</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Verified Role Name</label>
-                        <input 
-                            type="text" 
-                            list="role-verified-options"
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.roleVerified || ''}
-                            onChange={e => setSettings({...settings, roleVerified: e.target.value})}
-                        />
-                        <datalist id="role-verified-options">
-                            {roles.map(role => (
-                                <option key={`${role.id}-verified`} value={role.id} label={role.name} />
-                            ))}
-                        </datalist>
-                        <p className="text-xs text-gray-500 mt-1">Текущая роль: {getRoleDisplay(settings.roleVerified)}</p>
+                    <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                        <button 
+                            onClick={handleSaveSettings}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium shadow-sm"
+                        >
+                            <Save size={18} />
+                            {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
                     </div>
                 </div>
-                <div className="mt-6 flex justify-end">
-                    <button 
-                        onClick={handleSaveSettings}
-                        disabled={saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        <Save size={18} />
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                </div>
-            </div>
+            )}
 
-            {/* Default Auto-Mute Settings */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold mb-2 text-gray-800">Auto-Mute Defaults</h2>
-                <p className="text-sm text-gray-500 mb-6">Эти параметры используются, если ни одно правило эскалации не срабатывает. Порог = 0 отключает автоматический таймаут.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Порог (очки)</label>
-                        <input 
-                            type="number"
-                            min={0}
-                            max={200}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.autoMuteThreshold}
-                            onChange={e => setSettings(prev => ({ ...prev, autoMuteThreshold: Math.max(0, Number(e.target.value)) }))}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">По умолчанию: 20. Значение 0 отключает правило.</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Длительность таймаута (мин)</label>
-                        <input 
-                            type="number"
-                            min={1}
-                            max={10080}
-                            className="w-full p-2 border border-gray-300 rounded-lg"
-                            value={settings.autoMuteDuration}
-                            onChange={e => setSettings(prev => ({ ...prev, autoMuteDuration: Math.max(1, Number(e.target.value)) }))}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">По умолчанию: 60 минут.</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Escalation Rules (New) */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-red-50 rounded-lg">
-                        <AlertTriangle className="text-red-600" size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-gray-800">Automod Rules (Escalations)</h2>
-                        <p className="text-sm text-gray-500">Automatically punish users when they reach point thresholds</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                    {Array.isArray(escalations) && escalations.map(rule => (
-                        <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-4">
-                                <div className="flex flex-col">
-                                    <span className="font-bold text-gray-800">{rule.name || 'Rule'}</span>
-                                    <span className="text-sm text-gray-500">≥ {rule.threshold} pts</span>
-                                </div>
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                    rule.action === 'ban' ? 'bg-red-100 text-red-700' : 
-                                    rule.action === 'kick' ? 'bg-orange-100 text-orange-700' : 
-                                    'bg-yellow-100 text-yellow-700'
-                                }`}>
-                                    {rule.action.toUpperCase()}
-                                </span>
-                                {rule.action === 'mute' && (
-                                    <span className="text-sm text-gray-500">for {rule.duration} mins</span>
-                                )}
+            {/* Automod Settings */}
+            {activeTab === 'automod' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    {/* Default Auto-Mute Settings */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <h2 className="text-xl font-bold mb-2 text-gray-800">Default Auto-Mute</h2>
+                        <p className="text-sm text-gray-500 mb-6">Fallback rules when no specific escalation matches. Set threshold to 0 to disable.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Threshold (Points)</label>
+                                <input 
+                                    type="number"
+                                    min={0}
+                                    max={200}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    value={settings.autoMuteThreshold}
+                                    onChange={e => setSettings(prev => ({ ...prev, autoMuteThreshold: Math.max(0, Number(e.target.value)) }))}
+                                />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Minutes)</label>
+                                <input 
+                                    type="number"
+                                    min={1}
+                                    max={10080}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    value={settings.autoMuteDuration}
+                                    onChange={e => setSettings(prev => ({ ...prev, autoMuteDuration: Math.max(1, Number(e.target.value)) }))}
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end">
                             <button 
-                                onClick={() => handleDeleteEscalation(rule.id)}
-                                className="text-gray-400 hover:text-red-600 transition-colors"
+                                onClick={handleSaveSettings}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm font-medium"
                             >
-                                <Trash2 size={18} />
+                                <Save size={16} />
+                                Save Defaults
                             </button>
                         </div>
-                    ))}
-                    {escalations.length === 0 && (
-                        <p className="text-center text-gray-400 py-4">No rules defined. Users will only be warned.</p>
-                    )}
-                </div>
+                    </div>
 
-                <div className="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg border border-gray-200 border-dashed">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
-                        <input 
-                            type="text" 
-                            className="w-32 p-2 border border-gray-300 rounded-lg"
-                            value={newRuleName}
-                            onChange={e => setNewRuleName(e.target.value)}
-                            placeholder="e.g. Mute 1h"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Threshold (Pts)</label>
-                        <input 
-                            type="number" 
-                            className="w-24 p-2 border border-gray-300 rounded-lg"
-                            value={newRuleThreshold}
-                            onChange={e => setNewRuleThreshold(Number(e.target.value))}
-                            min="1"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
-                        <select 
-                            className="w-32 p-2 border border-gray-300 rounded-lg"
-                            value={newRuleAction}
-                            onChange={e => setNewRuleAction(e.target.value as any)}
-                        >
-                            <option value="mute">Mute</option>
-                            <option value="kick">Kick</option>
-                            <option value="ban">Ban</option>
-                        </select>
-                    </div>
-                    {newRuleAction === 'mute' && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Duration (Min)</label>
-                            <input 
-                                type="number" 
-                                className="w-24 p-2 border border-gray-300 rounded-lg"
-                                value={newRuleDuration}
-                                onChange={e => setNewRuleDuration(Number(e.target.value))}
-                                min="1"
-                            />
+                    {/* Escalation Rules */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+                                <AlertTriangle size={20} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">Escalation Rules</h2>
+                                <p className="text-sm text-gray-500">Specific punishments for point thresholds.</p>
+                            </div>
                         </div>
-                    )}
-                    <button 
-                        onClick={handleAddEscalation}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 ml-auto"
-                    >
-                        <Plus size={18} />
-                        Add Rule
-                    </button>
+
+                        <div className="space-y-3 mb-6">
+                            {Array.isArray(escalations) && escalations.map(rule => (
+                                <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-800">{rule.name || 'Rule'}</span>
+                                            <span className="text-sm text-gray-500">≥ {rule.threshold} pts</span>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                            rule.action === 'ban' ? 'bg-red-100 text-red-700' : 
+                                            rule.action === 'kick' ? 'bg-orange-100 text-orange-700' : 
+                                            'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                            {rule.action}
+                                        </span>
+                                        {rule.action === 'mute' && (
+                                            <span className="text-sm text-gray-500 font-medium">{rule.duration}m</span>
+                                        )}
+                                    </div>
+                                    <button 
+                                        onClick={() => handleDeleteEscalation(rule.id)}
+                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            ))}
+                            {escalations.length === 0 && (
+                                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                                    <p className="text-gray-400">No custom rules defined.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Add New Rule</h3>
+                            <div className="flex flex-wrap gap-4 items-end">
+                                <div className="flex-1 min-w-[150px]">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        value={newRuleName}
+                                        onChange={e => setNewRuleName(e.target.value)}
+                                        placeholder="e.g. Mute 1h"
+                                    />
+                                </div>
+                                <div className="w-24">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Threshold</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        value={newRuleThreshold}
+                                        onChange={e => setNewRuleThreshold(Number(e.target.value))}
+                                        min="1"
+                                    />
+                                </div>
+                                <div className="w-32">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
+                                    <select 
+                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        value={newRuleAction}
+                                        onChange={e => setNewRuleAction(e.target.value as any)}
+                                    >
+                                        <option value="mute">Mute</option>
+                                        <option value="kick">Kick</option>
+                                        <option value="ban">Ban</option>
+                                    </select>
+                                </div>
+                                {newRuleAction === 'mute' && (
+                                    <div className="w-24">
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Duration (m)</label>
+                                        <input 
+                                            type="number" 
+                                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                            value={newRuleDuration}
+                                            onChange={e => setNewRuleDuration(Number(e.target.value))}
+                                            min="1"
+                                        />
+                                    </div>
+                                )}
+                                <button 
+                                    onClick={handleAddEscalation}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors text-sm font-medium ml-auto"
+                                >
+                                    <Plus size={16} />
+                                    Add Rule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Warning Presets */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold mb-6 text-gray-800">Warning Presets</h2>
-                <div className="space-y-3 mb-6">
-                    {Array.isArray(presets) && presets.map(preset => (
-                        <div key={preset.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
-                                <span className="font-medium text-gray-900">{preset.name}</span>
-                                <span className="ml-2 text-sm text-gray-500">({preset.points} points)</span>
+            {activeTab === 'presets' && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800">Warning Presets</h2>
+                    <div className="space-y-3 mb-6">
+                        {Array.isArray(presets) && presets.map(preset => (
+                            <div key={preset.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                                <div>
+                                    <span className="font-medium text-gray-900">{preset.name}</span>
+                                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        {preset.points} pts
+                                    </span>
+                                </div>
+                                <button 
+                                    onClick={() => handleDeletePreset(preset.id)}
+                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
                             </div>
+                        ))}
+                        {presets.length === 0 && (
+                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                                <p className="text-gray-400">No presets defined.</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Add New Preset</h3>
+                        <div className="flex gap-3">
+                            <input 
+                                type="text" 
+                                placeholder="Reason (e.g. Spamming)"
+                                className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
+                                value={newPresetName}
+                                onChange={e => setNewPresetName(e.target.value)}
+                            />
+                            <input 
+                                type="number" 
+                                placeholder="Pts"
+                                className="w-24 p-2 border border-gray-300 rounded-lg text-sm"
+                                value={newPresetPoints}
+                                onChange={e => setNewPresetPoints(Number(e.target.value))}
+                                min="1"
+                                max="20"
+                            />
                             <button 
-                                onClick={() => handleDeletePreset(preset.id)}
-                                className="text-gray-400 hover:text-red-600"
+                                onClick={handleAddPreset}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                             >
-                                <Trash2 size={18} />
+                                <Plus size={16} />
+                                Add
                             </button>
                         </div>
-                    ))}
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <input 
-                        type="text" 
-                        placeholder="Reason (e.g. Spam)"
-                        className="flex-1 p-2 border border-gray-300 rounded-lg"
-                        value={newPresetName}
-                        onChange={e => setNewPresetName(e.target.value)}
-                    />
-                    <input 
-                        type="number" 
-                        placeholder="Pts"
-                        className="w-20 p-2 border border-gray-300 rounded-lg"
-                        value={newPresetPoints}
-                        onChange={e => setNewPresetPoints(Number(e.target.value))}
-                        min="1"
-                        max="20"
-                    />
-                    <button 
-                        onClick={handleAddPreset}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                    >
-                        <Plus size={18} />
-                        Add
-                    </button>
-                </div>
-            </div>
+            )}
         </div>
     );
 };

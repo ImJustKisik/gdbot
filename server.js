@@ -388,7 +388,101 @@ app.get('/api/auth/callback', async (req, res) => {
             console.warn(`Verified user ${userId} is no longer in the guild.`);
         }
 
-        res.send('<h1>Verification Successful!</h1><p>You can close this window and return to Discord.</p>');
+        res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Successful</title>
+    <style>
+        body {
+            background-color: #2b2d31;
+            color: #f2f3f5;
+            font-family: 'gg sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: #313338;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 90%;
+        }
+        .success-animation { margin: 20px auto; }
+        .checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: block;
+            stroke-width: 4;
+            stroke: #23a559;
+            stroke-miterlimit: 10;
+            box-shadow: inset 0px 0px 0px #23a559;
+            animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+            position: relative;
+            top: 5px;
+            right: 5px;
+            margin: 0 auto;
+        }
+        .checkmark__circle {
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            stroke-width: 4;
+            stroke-miterlimit: 10;
+            stroke: #23a559;
+            fill: #313338;
+            animation: stroke .6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+        .checkmark__check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: stroke .3s cubic-bezier(0.65, 0, 0.45, 1) .8s forwards;
+        }
+        @keyframes stroke { 100% { stroke-dashoffset: 0; } }
+        @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+        @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 50px #23a559; } }
+        
+        h1 { color: #fff; margin-top: 20px; font-size: 24px; }
+        p { color: #b5bac1; margin: 15px 0 25px; line-height: 1.5; }
+        .btn {
+            background-color: #5865F2;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .btn:hover { background-color: #4752C4; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-animation">
+            <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none" />
+                <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+            </svg>
+        </div>
+        <h1>Verification Successful!</h1>
+        <p>You're all set! Redirecting you to the server in a few seconds...</p>
+        <a href="https://discord.com/channels/${GUILD_ID}" class="btn">Open Discord Now</a>
+    </div>
+    <script>
+        setTimeout(() => {
+            window.location.href = 'https://discord.com/channels/${GUILD_ID}';
+        }, 3000);
+    </script>
+</body>
+</html>`);
 
     } catch (error) {
         console.error('OAuth Error:', error.response?.data || error.message);
@@ -477,6 +571,36 @@ app.get('/api/users/:id/warnings', requireAuth, (req, res) => {
 app.get('/api/settings', requireAuth, (req, res) => {
     const settings = db.getAllSettings();
     res.json({ ...DEFAULT_SETTINGS, ...settings });
+});
+
+app.get('/api/settings/bundle', requireAuth, async (req, res) => {
+    try {
+        const guild = await getGuild();
+        const settings = db.getAllSettings();
+        const presets = db.getPresets();
+        const escalations = db.getEscalations();
+        
+        const roles = guild.roles.cache
+            .filter(r => r.name !== '@everyone')
+            .map(r => ({ id: r.id, name: r.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+            
+        const channels = guild.channels.cache
+            .filter(channel => isTextBasedGuildChannel(channel))
+            .map(channel => ({ id: channel.id, name: channel.name || `#${channel.id}` }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        res.json({
+            settings: { ...DEFAULT_SETTINGS, ...settings },
+            presets,
+            escalations,
+            roles,
+            channels
+        });
+    } catch (error) {
+        console.error('Failed to fetch settings bundle:', error);
+        res.status(500).json({ error: 'Failed to fetch settings bundle' });
+    }
 });
 
 app.post('/api/settings', requireAuth, async (req, res) => {
