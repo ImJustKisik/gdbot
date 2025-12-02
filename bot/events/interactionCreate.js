@@ -48,6 +48,9 @@ async function handleInteraction(interaction) {
     try {
         await command.execute(interaction);
     } catch (error) {
+        // Ignore "Unknown interaction" errors as they usually mean double-processing or timeout
+        if (error.code === 10062) return;
+
         console.error('Error executing command:', error);
         try {
             if (interaction.replied || interaction.deferred) {
@@ -56,7 +59,10 @@ async function handleInteraction(interaction) {
                 await interaction.reply({ content: 'There was an error executing this command!', flags: MessageFlags.Ephemeral });
             }
         } catch (err) {
-            console.error('Error sending error message:', err);
+            // Ignore errors when trying to report an error
+            if (err.code !== 10062) {
+                console.error('Error sending error message:', err);
+            }
         }
     }
 }
