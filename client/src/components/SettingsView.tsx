@@ -237,6 +237,23 @@ export const SettingsView: React.FC = () => {
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
                         </div>
                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Mod Log Channel</label>
+                            <input 
+                                type="text" 
+                                list="mod-log-channel-options"
+                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                value={settings.modLogChannelId || ''}
+                                onChange={e => setSettings({...settings, modLogChannelId: e.target.value})}
+                                placeholder="Search or enter ID..."
+                            />
+                            <datalist id="mod-log-channel-options">
+                                {channels.map(channel => (
+                                    <option key={`${channel.id}-mod`} value={channel.id} label={`#${channel.name}`} />
+                                ))}
+                            </datalist>
+                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.modLogChannelId)}</p>
+                        </div>
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel</label>
                             <input 
                                 type="text" 
