@@ -14,8 +14,16 @@ export interface Preset {
   points: number;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export const usersApi = {
-  getAll: () => api.get<User[]>('/users').then((res) => res.data),
+  // Requesting a large limit to get all users for now, until frontend pagination is implemented
+  getAll: () => api.get<PaginatedResponse<User>>('/users?limit=1000').then((res) => res.data.data),
   
   getWarnings: (userId: string) => 
     api.get<{ warnings: Warning[] }>(`/users/${userId}/warnings`).then((res) => res.data),
