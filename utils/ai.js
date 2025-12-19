@@ -1,5 +1,4 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { pipeline } = require('@xenova/transformers');
 const { GENAI_API_KEYS } = require('./config');
 
 // Initialize models for all keys
@@ -27,6 +26,7 @@ let toxicityClassifier = null;
 async function getToxicityClassifier() {
     if (!toxicityClassifier) {
         console.log("Loading local toxicity model (Xenova/toxic-bert)...");
+        const { pipeline } = await import('@xenova/transformers');
         toxicityClassifier = await pipeline('text-classification', 'Xenova/toxic-bert');
         console.log("Local toxicity model loaded.");
     }
