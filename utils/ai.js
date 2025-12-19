@@ -25,9 +25,10 @@ let toxicityClassifier = null;
 
 async function getToxicityClassifier() {
     if (!toxicityClassifier) {
-        console.log("Loading local toxicity model (Xenova/toxic-bert)...");
+        console.log("Loading local toxicity model (Xenova/multilingual-toxic-xlm-roberta)...");
         const { pipeline } = await import('@xenova/transformers');
-        toxicityClassifier = await pipeline('text-classification', 'Xenova/toxic-bert');
+        // Using multilingual model for Russian support
+        toxicityClassifier = await pipeline('text-classification', 'Xenova/multilingual-toxic-xlm-roberta');
         console.log("Local toxicity model loaded.");
     }
     return toxicityClassifier;
