@@ -9,7 +9,9 @@ module.exports = {
         .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
         .addStringOption(option => option.setName('preset').setDescription('Select a preset reason').setAutocomplete(true))
         .addStringOption(option => option.setName('reason').setDescription('Reason for warning (overrides preset name)'))
-        .addIntegerOption(option => option.setName('points').setDescription('Points to add (overrides preset points)').setMinValue(1).setMaxValue(20)),
+        .addIntegerOption(option => option.setName('points').setDescription('Points to add (overrides preset points)').setMinValue(1).setMaxValue(20))
+        .addAttachmentOption(option => option.setName('evidence').setDescription('Screenshot or proof of violation'))
+        .addBooleanOption(option => option.setName('silent').setDescription('If true, the user will NOT receive a DM')),
 
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused();
@@ -30,6 +32,8 @@ module.exports = {
         const presetId = interaction.options.getString('preset');
         let reason = interaction.options.getString('reason');
         let points = interaction.options.getInteger('points');
+        const evidence = interaction.options.getAttachment('evidence');
+        const silent = interaction.options.getBoolean('silent') || false;
 
         // Resolve Preset
         if (presetId) {
@@ -55,28 +59,48 @@ module.exports = {
             reason,
             points,
             date: new Date().toISOString(),
-            moderator: interaction.user.tag
+            moderator: interaction.user.tag,
+            evidence: evidence ? evidence.url : null
         };
         db.addWarning(targetUser.id, warning);
         
         const user = db.getUser(targetUser.id);
 
-        await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', [
+        const logFields = [
             { name: 'Reason', value: reason },
             { name: 'Points', value: `+${points} (Total: ${user.points})` }
-        ]);
+        ];
+        if (silent) logFields.push({ name: 'Silent Mode', value: 'True (No DM sent)' });
 
-        try {
-            const embed = new EmbedBuilder()
-                .setTitle('You have been warned')
-                .setColor('Orange')
-                .addFields(
-                    { name: 'Reason', value: reason },
-                    { name: 'Points Added', value: points.toString() },
-                    { name: 'Total Points', value: user.points.toString() }
-                );
-            await targetMember.send({ embeds: [embed] });
-        } catch (e) {}
+        await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', logFields);
+        
+        // If evidence exists, send it to the log channel as well (logAction helper might need update to support images, 
+        // but for now we can just rely on the fact that we stored it. 
+        // Ideally logAction should accept an image, but let's keep it simple for now).
+
+        let dmStatus = '✅ DM Sent';
+        if (!silent) {
+            try {
+                const embed = new EmbedBuilder()
+                    .setTitle('You have been warned')
+                    .setColor('Orange')
+                    .addFields(
+                        { name: 'Reason', value: reason },
+                        { name: 'Points Added', value: points.toString() },
+                        { name: 'Total Points', value: user.points.toString() }
+                    );
+                
+                if (evidence) {
+                    embed.setImage(evidence.url);
+                }
+
+                await targetMember.send({ embeds: [embed] });
+            } catch (e) {
+                dmStatus = '⚠️ DM Failed (Closed DMs)';
+            }
+        } else {
+            dmStatus = '🔕 Silent (No DM)';
+        }
 
         let autoMuteMsg = '';
 
@@ -144,7 +168,7 @@ module.exports = {
             }
         }
 
-        const baseMessage = `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.`;
+        const baseMessage = `✅ Warned ${targetUser.tag} for "${reason}" (+${points} points). Total: ${user.points}.\nStatus: ${dmStatus}`;
         await interaction.editReply({ content: `${baseMessage}${autoMuteMsg}` });
     }
 };

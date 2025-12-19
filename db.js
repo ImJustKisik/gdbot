@@ -82,6 +82,18 @@ try {
     console.error("Migration check failed:", e);
 }
 
+// 0.2 Add 'evidence' column to warnings if missing
+try {
+    const tableInfo = db.prepare("PRAGMA table_info(warnings)").all();
+    const hasEvidence = tableInfo.some(col => col.name === 'evidence');
+    if (!hasEvidence && tableInfo.length > 0) {
+        console.log("Migrating warnings table: Adding 'evidence' column...");
+        db.exec("ALTER TABLE warnings ADD COLUMN evidence TEXT");
+    }
+} catch (e) {
+    console.error("Migration check failed (warnings):", e);
+}
+
 // 1. JSON to SQLite Blob (Legacy)
 function migrateFromJson() {
     if (fs.existsSync(jsonPath)) {
@@ -316,15 +328,15 @@ module.exports = {
     },
 
     addWarning: (userId, warning) => {
-        const { reason, points, moderator, date } = warning;
+        const { reason, points, moderator, date, evidence } = warning;
         
         const transaction = db.transaction(() => {
             // Ensure user exists
             db.prepare('INSERT OR IGNORE INTO users_v2 (id, points) VALUES (?, 0)').run(userId);
             
             // Add warning
-            db.prepare('INSERT INTO warnings (user_id, moderator, reason, points, date) VALUES (?, ?, ?, ?, ?)').run(
-                userId, moderator, reason, points, date || new Date().toISOString()
+            db.prepare('INSERT INTO warnings (user_id, moderator, reason, points, date, evidence) VALUES (?, ?, ?, ?, ?, ?)').run(
+                userId, moderator, reason, points, date || new Date().toISOString(), evidence || null
             );
             
             // Update points
