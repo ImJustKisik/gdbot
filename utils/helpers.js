@@ -70,7 +70,7 @@ function getConfiguredRole(guild, settingKey) {
     return role;
 }
 
-async function logAction(guild, title, description, color = 'Blue', fields = []) {
+async function logAction(guild, title, description, color = 'Blue', fields = [], imageUrl = null) {
     // Determine channel type based on color/title context
     // Red/Orange usually implies moderation action
     const isModAction = ['Red', 'Orange'].includes(color) || title.includes('Warn') || title.includes('Punish') || title.includes('Mute') || title.includes('Ban') || title.includes('Kick');
@@ -93,6 +93,10 @@ async function logAction(guild, title, description, color = 'Blue', fields = [])
         .setColor(color)
         .addFields(fields)
         .setTimestamp();
+
+    if (imageUrl) {
+        embed.setImage(imageUrl);
+    }
 
     try {
         await channel.send({ embeds: [embed] });

@@ -72,7 +72,14 @@ module.exports = {
         ];
         if (silent) logFields.push({ name: 'Silent Mode', value: 'True (No DM sent)' });
 
-        await logAction(interaction.guild, 'User Warned (Command)', `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 'Orange', logFields);
+        await logAction(
+            interaction.guild, 
+            'User Warned (Command)', 
+            `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 
+            'Orange', 
+            logFields,
+            evidence ? evidence.url : null
+        );
         
         // If evidence exists, send it to the log channel as well (logAction helper might need update to support images, 
         // but for now we can just rely on the fact that we stored it. 
