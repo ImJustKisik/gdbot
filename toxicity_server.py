@@ -3,8 +3,9 @@ import json
 import traceback
 
 # Force UTF-8 encoding for stdin/stdout
-sys.stdin.reconfigure(encoding='utf-8')
-sys.stdout.reconfigure(encoding='utf-8')
+if sys.version_info[0] >= 3:
+    sys.stdin.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def install_and_import():
     try:
@@ -14,19 +15,28 @@ def install_and_import():
         return None
 
 def main():
-    print(json.dumps({"status": "loading", "message": "Loading Detoxify model..."}), flush=True)
+    # Check Python version
+    if sys.version_info[0] < 3:
+        sys.stderr.write("Error: This script requires Python 3. Please run with python3.\n")
+        sys.exit(1)
+
+    print(json.dumps({"status": "loading", "message": "Loading Detoxify model..."}))
+    sys.stdout.flush()
     
     Detoxify = install_and_import()
     if not Detoxify:
-        print(json.dumps({"status": "error", "message": "Module 'detoxify' not found. Run: pip install detoxify"}), flush=True)
+        print(json.dumps({"status": "error", "message": "Module 'detoxify' not found. Run: pip install detoxify"}))
+        sys.stdout.flush()
         return
 
     try:
         # Load multilingual model (supports Russian)
         model = Detoxify('multilingual')
-        print(json.dumps({"status": "ready", "message": "Model loaded"}), flush=True)
+        print(json.dumps({"status": "ready", "message": "Model loaded"}))
+        sys.stdout.flush()
     except Exception as e:
-        print(json.dumps({"status": "error", "message": f"Failed to load model: {str(e)}"}), flush=True)
+        print(json.dumps({"status": "error", "message": f"Failed to load model: {str(e)}"}))
+        sys.stdout.flush()
         return
 
     # Main loop
@@ -39,7 +49,8 @@ def main():
             text = data.get('text', '')
             
             if not text:
-                print(json.dumps({"error": "No text provided"}), flush=True)
+                print(json.dumps({"error": "No text provided"}))
+                sys.stdout.flush()
                 continue
 
             # Predict
@@ -48,12 +59,15 @@ def main():
             # Convert numpy floats to python floats
             sanitized = {k: float(v) for k, v in results.items()}
             
-            print(json.dumps({"status": "ok", "results": sanitized}), flush=True)
+            print(json.dumps({"status": "ok", "results": sanitized}))
+            sys.stdout.flush()
             
         except json.JSONDecodeError:
-            print(json.dumps({"status": "error", "message": "Invalid JSON input"}), flush=True)
+            print(json.dumps({"status": "error", "message": "Invalid JSON input"}))
+            sys.stdout.flush()
         except Exception as e:
-            print(json.dumps({"status": "error", "message": str(e)}), flush=True)
+            print(json.dumps({"status": "error", "message": str(e)}))
+            sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
