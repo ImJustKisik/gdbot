@@ -20,8 +20,9 @@ if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
     });
 }
 
-// Local Toxicity Model (Lazy loaded)
+// Local Models (Lazy loaded)
 let toxicityClassifier = null;
+let sentimentClassifier = null;
 
 async function getToxicityClassifier() {
     if (!toxicityClassifier) {
@@ -31,6 +32,16 @@ async function getToxicityClassifier() {
         console.log("Local toxicity model loaded.");
     }
     return toxicityClassifier;
+}
+
+async function getSentimentClassifier() {
+    if (!sentimentClassifier) {
+        console.log("Loading local sentiment model (Xenova/bert-base-multilingual-uncased-sentiment)...");
+        const { pipeline } = await import('@xenova/transformers');
+        sentimentClassifier = await pipeline('text-classification', 'Xenova/bert-base-multilingual-uncased-sentiment');
+        console.log("Local sentiment model loaded.");
+    }
+    return sentimentClassifier;
 }
 
 // Round-robin counter
@@ -63,8 +74,31 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
             const hasCyrillic = /[а-яА-ЯёЁ]/.test(text);
             
             if (hasCyrillic) {
-                console.log(`[Local AI] Cyrillic detected. Skipping local check, sending to Gemini.`);
-                // We don't return null here, we just skip the local check and proceed to Gemini
+                // Use Sentiment Analysis for Russian
+                // 1 star / 2 stars = Negative (Potential Toxicity)
+                // 3 stars = Neutral
+                // 4 stars / 5 stars = Positive
+                try {
+                    const classifier = await getSentimentClassifier();
+                    const results = await classifier(text);
+                    // Example result: [{ label: '1 star', score: 0.95 }]
+                    const topResult = results[0];
+                    
+                    console.log(`[Local AI] Sentiment for "${text.substring(0, 20)}...": ${topResult.label} (${(topResult.score * 100).toFixed(1)}%)`);
+
+                    const isNegative = ['1 star', '2 stars'].includes(topResult.label);
+                    
+                    if (isNegative) {
+                        localScores = `Sentiment: ${topResult.label}`;
+                    } else if (!imageBuffer) {
+                        // If sentiment is Neutral/Positive (3-5 stars) and no image -> Skip Gemini
+                        console.log(`[AI] Skipping Gemini: Sentiment is ${topResult.label} (Not Negative)`);
+                        return null;
+                    }
+                } catch (e) {
+                    console.error("Local Sentiment AI Error:", e);
+                    // Fallback to Gemini on error
+                }
             } else {
                 const classifier = await getToxicityClassifier();
                 const results = await classifier(text, { topk: null }); 
