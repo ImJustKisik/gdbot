@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { BarChart3, TrendingUp } from 'lucide-react';
+import { statsApi } from '../api/stats';
 
 interface GuildStat {
     id: string;
@@ -23,19 +23,19 @@ export const AnalyticsView: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [guildsRes, activityRes] = await Promise.all([
-                    axios.get('/api/stats/guilds'),
-                    axios.get('/api/stats/activity')
+                const [guildsData, activityData] = await Promise.all([
+                    statsApi.getGuilds(),
+                    statsApi.getActivity()
                 ]);
                 
-                console.log("Analytics Data Received:", { guilds: guildsRes.data, activity: activityRes.data });
+                console.log("Analytics Data Received:", { guilds: guildsData, activity: activityData });
 
-                if (Array.isArray(guildsRes.data)) {
-                    setGuildStats(guildsRes.data);
+                if (Array.isArray(guildsData)) {
+                    setGuildStats(guildsData);
                 }
                 
-                if (Array.isArray(activityRes.data)) {
-                    setActivityStats(activityRes.data);
+                if (Array.isArray(activityData)) {
+                    setActivityStats(activityData);
                 }
             } catch (error) {
                 console.error('Failed to fetch analytics', error);

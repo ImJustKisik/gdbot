@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const crypto = require('crypto');
 const { PermissionsBitField } = require('discord.js');
 const db = require('../db');
 const { consumeVerificationState } = require('../verification-state');
@@ -10,12 +11,15 @@ const router = express.Router();
 
 // Auth: Login URL
 router.get('/login', (req, res) => {
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthState = state;
+
     const oauthUrl = new URL('https://discord.com/api/oauth2/authorize');
     oauthUrl.searchParams.append('client_id', CLIENT_ID);
     oauthUrl.searchParams.append('redirect_uri', REDIRECT_URI);
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('scope', 'identify guilds');
-    oauthUrl.searchParams.append('state', 'dashboard_login');
+    oauthUrl.searchParams.append('state', state);
     res.redirect(oauthUrl.toString());
 });
 
@@ -70,7 +74,11 @@ router.get('/callback', async (req, res) => {
         const { access_token, refresh_token } = tokenResponse.data;
 
         // --- DASHBOARD LOGIN FLOW ---
-        if (state === 'dashboard_login') {
+        // Check if state matches the session state (CSRF protection)
+        if (req.session.oauthState && state === req.session.oauthState) {
+            // Clear state after use
+            delete req.session.oauthState;
+
             // Fetch User Info
             const userResponse = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${access_token}` }
@@ -109,6 +117,10 @@ router.get('/callback', async (req, res) => {
             };
 
             return res.redirect('/');
+        } else if (req.session.oauthState) {
+            // State exists in session but doesn't match URL state -> Potential CSRF or stale session
+            console.warn('OAuth state mismatch. Session:', req.session.oauthState, 'Received:', state);
+            return res.status(400).send('<h1>Authorization Failed</h1><p>Invalid state parameter. Please try again.</p>');
         }
 
         // --- VERIFICATION FLOW (Existing) ---

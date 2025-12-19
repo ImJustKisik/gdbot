@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { Users, ShieldAlert, MicOff } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { User } from '../types';
-import axios from 'axios';
+import { statsApi } from '../api/stats';
 
 interface Props {
   users: User[];
@@ -22,8 +22,8 @@ export const DashboardStats: React.FC<Props> = ({ users }) => {
 
     const loadActivity = async () => {
       try {
-        const res = await axios.get('/api/stats/activity');
-        if (!Array.isArray(res.data) || cancelled) return;
+        const data = await statsApi.getActivity();
+        if (!Array.isArray(data) || cancelled) return;
 
         const today = new Date();
         const currentDay = today.getDay();
@@ -33,7 +33,7 @@ export const DashboardStats: React.FC<Props> = ({ users }) => {
         monday.setHours(0, 0, 0, 0);
 
         const counts = new Array(7).fill(0);
-        res.data.forEach((row: { day: string; count: number }) => {
+        data.forEach((row: { day: string; count: number }) => {
           const statDate = new Date(row.day);
           statDate.setHours(0, 0, 0, 0);
           if (statDate < monday) return;

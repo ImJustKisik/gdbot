@@ -1,42 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Save, Plus, Trash2, AlertTriangle, Settings as SettingsIcon, Shield, List } from 'lucide-react';
-
-interface Settings {
-    logChannelId: string;
-    verificationChannelId: string;
-    roleUnverified: string;
-    roleVerified: string;
-    autoMuteThreshold: number;
-    autoMuteDuration: number;
-}
-
-interface Preset {
-    id: number;
-    name: string;
-    points: number;
-}
-
-interface Escalation {
-    id: number;
-    name?: string;
-    threshold: number;
-    action: 'mute' | 'kick' | 'ban';
-    duration?: number;
-}
-
-interface SelectOption {
-    id: string;
-    name: string;
-}
-
-interface SettingsBundleResponse {
-    settings?: Settings;
-    presets?: Preset[];
-    escalations?: Escalation[];
-    roles?: SelectOption[];
-    channels?: SelectOption[];
-}
+import { settingsApi, Settings, Preset, Escalation, SelectOption } from '../api/settings';
 
 const INITIAL_SETTINGS: Settings = {
     logChannelId: '',
@@ -76,8 +40,7 @@ export const SettingsView: React.FC = () => {
     const fetchData = async () => {
         try {
             setLoadError(null);
-            const res = await axios.get<SettingsBundleResponse>('/api/settings/bundle');
-            const data = res.data || {};
+            const data = await settingsApi.getBundle();
             const bundleSettings = data.settings || { ...INITIAL_SETTINGS };
             setSettings({
                 ...INITIAL_SETTINGS,
@@ -106,10 +69,7 @@ export const SettingsView: React.FC = () => {
                 autoMuteThreshold: Number(settings.autoMuteThreshold) || 0,
                 autoMuteDuration: Math.max(1, Number(settings.autoMuteDuration) || INITIAL_SETTINGS.autoMuteDuration)
             };
-            const response = await axios.post('/api/settings', payload);
-            if (response.data?.settings) {
-                setSettings(response.data.settings);
-            }
+            await settingsApi.updateSettings(payload);
             setFeedback({ type: 'success', message: 'Настройки сохранены.' });
             setTimeout(() => setFeedback(null), 3000);
         } catch (error: any) {
@@ -123,7 +83,7 @@ export const SettingsView: React.FC = () => {
     const handleAddPreset = async () => {
         if (!newPresetName.trim()) return;
         try {
-            await axios.post('/api/presets', { name: newPresetName, points: newPresetPoints });
+            await settingsApi.createPreset(newPresetName, newPresetPoints);
             setNewPresetName('');
             setNewPresetPoints(1);
             await fetchData();
@@ -135,7 +95,7 @@ export const SettingsView: React.FC = () => {
     const handleDeletePreset = async (id: number) => {
         if (!confirm('Удалить этот пресет предупреждения?')) return;
         try {
-            await axios.delete(`/api/presets/${id}`);
+            await settingsApi.deletePreset(id);
             await fetchData();
         } catch (error) {
             alert('Failed to delete preset');
@@ -144,7 +104,7 @@ export const SettingsView: React.FC = () => {
 
     const handleAddEscalation = async () => {
         try {
-            await axios.post('/api/escalations', { 
+            await settingsApi.createEscalation({ 
                 name: newRuleName || `Rule ${escalations.length + 1}`,
                 threshold: newRuleThreshold, 
                 action: newRuleAction, 
@@ -161,7 +121,7 @@ export const SettingsView: React.FC = () => {
     const handleDeleteEscalation = async (id: number) => {
         if (!confirm('Удалить это правило автомодерации?')) return;
         try {
-            await axios.delete(`/api/escalations/${id}`);
+            await settingsApi.deleteEscalation(id);
             await fetchData();
         } catch (error) {
             alert('Failed to delete rule');

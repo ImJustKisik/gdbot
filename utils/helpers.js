@@ -26,7 +26,7 @@ function findChannelBySetting(guild, value) {
 }
 
 function isTextBasedGuildChannel(channel) {
-    return channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement);
+    return Boolean(channel && (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement));
 }
 
 function normalizeChannelSetting(guild, value, label) {

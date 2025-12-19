@@ -53,6 +53,7 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_warnings_user_id ON warnings(user_id);
+  CREATE INDEX IF NOT EXISTS idx_users_points ON users_v2(points DESC);
 `);
 
 // --- Migrations ---
@@ -123,15 +124,16 @@ function migrateToNormalized() {
 
     console.log("Starting migration from Blob to Normalized Schema...");
     
-    const oldUsers = db.prepare("SELECT id, data FROM users").all();
-    if (oldUsers.length === 0) return;
+    const oldUsersStmt = db.prepare("SELECT id, data FROM users");
+    // Check if empty (optional, but iterate handles empty too)
+    // if (oldUsers.length === 0) return; // Removed check for simplicity or use count
 
     const insertUser = db.prepare("INSERT OR IGNORE INTO users_v2 (id, points) VALUES (?, ?)");
     const insertWarning = db.prepare("INSERT INTO warnings (user_id, moderator, reason, points, date) VALUES (?, ?, ?, ?, ?)");
     const insertOAuth = db.prepare("INSERT OR REPLACE INTO user_oauth (user_id, access_token, refresh_token, guilds, verified_at) VALUES (?, ?, ?, ?, ?)");
 
-    const transaction = db.transaction((users) => {
-        for (const row of users) {
+    const transaction = db.transaction(() => {
+        for (const row of oldUsersStmt.iterate()) {
             try {
                 const data = JSON.parse(row.data);
                 
@@ -168,8 +170,8 @@ function migrateToNormalized() {
     });
 
     try {
-        transaction(oldUsers);
-        console.log(`Successfully migrated ${oldUsers.length} users to normalized tables.`);
+        transaction();
+        console.log(`Successfully migrated users to normalized tables.`);
         // Rename legacy table to avoid confusion, but keep as backup
         db.exec("ALTER TABLE users RENAME TO users_legacy_blob");
     } catch (error) {
@@ -218,24 +220,26 @@ module.exports = {
 
     setMonitored: (userId, isMonitored) => {
         const val = isMonitored ? 1 : 0;
-        const transaction = db.transaction(() => {
-            db.prepare('INSERT OR IGNORE INTO users_v2 (id, points, is_monitored) VALUES (?, 0, ?)').run(userId, val);
-            db.prepare('UPDATE users_v2 SET is_monitored = ? WHERE id = ?').run(val, userId);
-        });
-        transaction();
+        db.prepare(`
+            INSERT INTO users_v2 (id, points, is_monitored) VALUES (?, 0, ?)
+            ON CONFLICT(id) DO UPDATE SET is_monitored=excluded.is_monitored
+        `).run(userId, val);
     },
 
-    // Optimized summary for lists (Dashboard)
-    getUsersSummary: () => {
+    // Optimized summary for lists (Dashboard) - Fetches only requested users
+    getUsersSummary: (userIds = []) => {
+        if (!userIds || userIds.length === 0) return {};
+
+        const placeholders = userIds.map(() => '?').join(',');
+        
+        // Optimized query: Filter users first, then join warnings
         const rows = db.prepare(`
-            SELECT u.id, u.points, u.is_monitored, COALESCE(w.warning_count, 0) AS warningsCount
+            SELECT u.id, u.points, u.is_monitored, COUNT(w.id) AS warningsCount
             FROM users_v2 u
-            LEFT JOIN (
-                SELECT user_id, COUNT(*) AS warning_count
-                FROM warnings
-                GROUP BY user_id
-            ) w ON w.user_id = u.id
-        `).all();
+            LEFT JOIN warnings w ON w.user_id = u.id
+            WHERE u.id IN (${placeholders})
+            GROUP BY u.id
+        `).all(...userIds);
 
         const result = {};
         for (const row of rows) {
@@ -252,6 +256,11 @@ module.exports = {
     // --- Analytics Methods ---
 
     getGuildStats: () => {
+        // Cache check
+        if (module.exports._guildStatsCache && Date.now() - module.exports._lastGuildStatsUpdate < 60000) {
+            return module.exports._guildStatsCache;
+        }
+
         // Fetch all stored guild lists
         const rows = db.prepare('SELECT guilds FROM user_oauth').all();
         const stats = {}; // guildId -> { name, icon, count }
@@ -277,9 +286,14 @@ module.exports = {
         }
 
         // Convert to array and sort by count descending
-        return Object.values(stats)
+        const result = Object.values(stats)
             .sort((a, b) => b.count - a.count)
             .slice(0, 10); // Top 10
+            
+        module.exports._guildStatsCache = result;
+        module.exports._lastGuildStatsUpdate = Date.now();
+        
+        return result;
     },
 
     getWarningStats: () => {

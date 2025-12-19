@@ -29,6 +29,10 @@ router.get('/user/:id/guilds', requireAuth, async (req, res) => {
 // 1. Synchronization (GET /api/users)
 router.get('/users', requireAuth, async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const startIndex = (page - 1) * limit;
+
         const guild = await getGuild();
         if (!guild) return res.status(500).json({ error: 'Guild not found' });
 
@@ -47,10 +51,19 @@ router.get('/users', requireAuth, async (req, res) => {
             return res.status(503).json({ error: 'Member cache unavailable, please try again shortly.' });
         }
 
-        // Use optimized summary fetch to avoid parsing huge OAuth data
-        const localUsers = db.getUsersSummary();
+        // Convert Map to Array and SORT for stable pagination
+        // Sorting by username ensures that the order doesn't change randomly between requests
+        const allMembers = Array.from(members.values()).sort((a, b) => 
+            a.user.username.localeCompare(b.user.username)
+        );
         
-        const responseData = members.map(member => {
+        const paginatedMembers = allMembers.slice(startIndex, startIndex + limit);
+        const targetIds = paginatedMembers.map(m => m.id);
+
+        // Fetch DB data ONLY for the users on this page (Non-blocking optimization)
+        const localUsers = db.getUsersSummary(targetIds);
+        
+        const responseData = paginatedMembers.map(member => {
             const localUser = localUsers[member.id] || { points: 0, warningsCount: 0 };
             
             // Determine status
@@ -71,7 +84,12 @@ router.get('/users', requireAuth, async (req, res) => {
             };
         });
 
-        res.json(responseData);
+        res.json({
+            data: responseData,
+            total: allMembers.length,
+            page,
+            totalPages: Math.ceil(allMembers.length / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch users' });

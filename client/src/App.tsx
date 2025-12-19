@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X } from 'lucide-react';
+import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
 import { UsersList } from './components/UsersList';
@@ -8,6 +8,8 @@ import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { User } from './types';
+import { authApi } from './api/auth';
+import { usersApi } from './api/users';
 
 interface AuthUser {
   id: string;
@@ -17,7 +19,7 @@ interface AuthUser {
 }
 
 function App() {
-  const [view, setView] = useState<'dashboard' | 'verification' | 'settings'>('dashboard');
+  const location = useLocation();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +33,10 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await axios.get('/api/auth/me');
-        if (res.data.authenticated) {
+        const data = await authApi.getMe();
+        if (data.authenticated) {
           setIsAuthenticated(true);
-          setCurrentUser(res.data.user);
+          setCurrentUser(data.user);
         } else {
           setIsAuthenticated(false);
         }
@@ -50,12 +52,12 @@ function App() {
   const fetchUsers = async () => {
     if (!isAuthenticated) return;
     try {
-      const res = await axios.get('/api/users');
-      if (Array.isArray(res.data)) {
-        setUsers(res.data);
+      const data = await usersApi.getAll();
+      if (Array.isArray(data)) {
+        setUsers(data);
         setError(null);
       } else {
-        console.error('Invalid users data:', res.data);
+        console.error('Invalid users data:', data);
         setUsers([]);
       }
     } catch (err) {
@@ -75,11 +77,11 @@ function App() {
   }, [isAuthenticated]);
 
   const handleLogin = () => {
-    window.location.href = '/api/auth/login';
+    authApi.login();
   };
 
   const handleLogout = async () => {
-    await axios.post('/api/auth/logout');
+    await authApi.logout();
     window.location.reload();
   };
 
@@ -168,33 +170,36 @@ function App() {
         </div>
 
         <nav className="px-4 space-y-2 flex-1">
-          <button 
-            onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }}
+          <Link 
+            to="/"
+            onClick={() => setIsMobileMenuOpen(false)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              view === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             <LayoutDashboard size={20} />
             Dashboard
-          </button>
-          <button 
-            onClick={() => { setView('verification'); setIsMobileMenuOpen(false); }}
+          </Link>
+          <Link 
+            to="/verification"
+            onClick={() => setIsMobileMenuOpen(false)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              view === 'verification' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              location.pathname === '/verification' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             <ShieldCheck size={20} />
             Verification
-          </button>
-          <button 
-            onClick={() => { setView('settings'); setIsMobileMenuOpen(false); }}
+          </Link>
+          <Link 
+            to="/settings"
+            onClick={() => setIsMobileMenuOpen(false)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              view === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+              location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
             <Settings size={20} />
             Settings
-          </button>
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100">
@@ -217,31 +222,32 @@ function App() {
           </button>
         </header>
 
-        {view === 'dashboard' ? (
-          <>
-            <div className="mb-8 flex justify-between items-end">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
-                <p className="text-gray-500">Server overview and moderation tools</p>
+        <Routes>
+          <Route path="/" element={
+            <>
+              <div className="mb-8 flex justify-between items-end">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
+                  <p className="text-gray-500">Server overview and moderation tools</p>
+                </div>
               </div>
-            </div>
-            
-            <DashboardStats users={users} />
-            
-            <ErrorBoundary>
-              <AnalyticsView />
-            </ErrorBoundary>
+              
+              <DashboardStats users={users} />
+              
+              <ErrorBoundary>
+                <AnalyticsView />
+              </ErrorBoundary>
 
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Member Management</h3>
-              <UsersList users={users} refresh={fetchUsers} />
-            </div>
-          </>
-        ) : view === 'verification' ? (
-          <VerificationView />
-        ) : (
-          <SettingsView />
-        )}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Member Management</h3>
+                <UsersList users={users} refresh={fetchUsers} />
+              </div>
+            </>
+          } />
+          <Route path="/verification" element={<VerificationView />} />
+          <Route path="/settings" element={<SettingsView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </div>
   );

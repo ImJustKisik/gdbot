@@ -1,11 +1,9 @@
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { getConfiguredRole, sendVerificationDM, getAppSetting } = require('../../utils/helpers');
-const { GUILD_ID, VERIFICATION_CHANNEL_NAME } = require('../../utils/config');
+const { VERIFICATION_CHANNEL_NAME } = require('../../utils/config');
 
 async function handleGuildMemberAdd(member) {
-    if (member.guild.id !== GUILD_ID) return;
-
-    console.log(`New member joined: ${member.user.tag}`);
+    console.log(`New member joined: ${member.user.tag} in guild: ${member.guild.name}`);
 
     // Add Unverified Role
     const roleUnverified = getConfiguredRole(member.guild, 'roleUnverified');

@@ -4,7 +4,7 @@
 
 ## Architecture Overview
 
-This is a **monolithic fullstack application** with three distinct layers that share state through a local JSON file:
+This is a **monolithic fullstack application** with three distinct layers that share state through a local SQLite database:
 
 1. **Discord Bot** (`server.js`) - Discord.js v14 client handling events, OAuth callbacks, and member management
 2. **REST API** (`server.js`) - Express server providing `/api/*` endpoints for the dashboard
@@ -16,7 +16,7 @@ This is a **monolithic fullstack application** with three distinct layers that s
 
 ### User State Synchronization
 - **Source of truth**: Discord Guild members cache (`guild.members.cache`)
-- **Persistent data**: `database.json` stores only custom fields (points, warnings, OAuth tokens)
+- **Persistent data**: `database.sqlite` stores custom fields (points, warnings, OAuth tokens) in normalized tables (`users_v2`, `warnings`, `user_oauth`)
 - **Merge pattern**: `GET /api/users` combines Discord member data with local DB records on-the-fly
 - **Cache strategy**: Members are fetched once at startup to avoid Opcode 8 rate limit errors
 
@@ -29,7 +29,7 @@ return { ...member.user, ...localUser }; // Discord data + custom fields
 ### OAuth Verification Flow
 1. New member joins → Bot sends QR code via DM with `state=userId`
 2. User scans → Redirected to Discord OAuth → Returns to `/api/auth/callback?code=X&state=userId`
-3. Backend exchanges code for token → Fetches user's guild list → Saves to `database.json`
+3. Backend exchanges code for token → Fetches user's guild list → Saves to `database.sqlite`
 4. **Critical bug**: If Discord drops the `state` parameter, verification fails (see FIXME in callback handler)
 
 **State parameter is essential** - it links the OAuth response back to the Discord member who initiated verification.
@@ -81,14 +81,13 @@ if (user.points > 20 && member.moderatable) {
 ```
 
 ### Database Operations
-Use `db.js` module - it handles JSON read/write with error recovery:
+Use `db.js` module - it handles SQLite operations with `better-sqlite3`:
 ```javascript
-const user = db.getUser(userId);  // Returns default object if not found
-user.points += 5;
-db.saveUser(userId, user);        // Writes to database.json
+const user = db.getUser(userId);  // Returns composite object from multiple tables
+db.addWarning(userId, { reason: "Spam", points: 5 }); // Transactional write
 ```
 
-**Never** manipulate `database.json` directly. Always use `db.js` methods.
+**Never** manipulate `database.sqlite` directly. Always use `db.js` methods.
 
 ## Common Pitfalls
 
@@ -105,10 +104,11 @@ db.saveUser(userId, user);        // Writes to database.json
 ## Key Files Reference
 
 - `server.js` - Monolithic backend (400+ lines, handles everything)
-- `db.js` - Simple JSON file wrapper (read/write/get operations)
+- `db.js` - SQLite wrapper (schema definitions, migrations, read/write operations)
 - `client/src/App.tsx` - Main dashboard with view router (dashboard/verification)
 - `client/src/components/UsersList.tsx` - Member table with warn/clear/view-guilds actions
-- `database.json` - Generated at runtime, stores: `{ users: { [userId]: { points, warnings, oauth } } }`
+- `database.sqlite` - SQLite database file (normalized tables: users_v2, warnings, user_oauth)
+- `database.json` - Legacy data file (kept for backup/migration)
 
 ## TypeScript Types
 
@@ -140,4 +140,4 @@ Backend constructs this shape in `GET /api/users` by merging Discord member data
 
 - Google Gemini AI integration exists but isn't wired to moderation (`analyzeText` function defined but unused)
 - `index.js` contains old slash command implementation - seems abandoned in favor of web dashboard
-- No database migrations - changing schema requires manual JSON editing
+- **Database Migrations**: Implemented in `db.js` (JSON -> SQLite, Schema updates). Future schema changes should be added to the migration logic.

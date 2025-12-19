@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Warning } from '../types';
 import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History, RefreshCw, Users, ShieldCheck, X, Loader2, Inbox } from 'lucide-react';
+import { usersApi, Guild } from '../api/users';
 
 const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted'; label: string }[] = [
   { value: 'all', label: 'Все' },
@@ -14,7 +15,6 @@ const RISK_FILTERS: { value: 'all' | 'low' | 'medium' | 'high'; label: string }[
   { value: 'medium', label: '10-19 pts' },
   { value: 'high', label: '20+ pts' },
 ];
-import axios from 'axios';
 
 type ActionType = 'warn' | 'clear' | 'verify' | 'guilds';
 
@@ -22,13 +22,6 @@ interface Props {
   users: User[];
   refresh: () => void;
   loading?: boolean;
-}
-
-interface Guild {
-    id: string;
-    name: string;
-    icon: string;
-    owner: boolean;
 }
 
 export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) => {
@@ -57,7 +50,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
 
   useEffect(() => {
     if (selectedUser) {
-        axios.get('/api/presets').then(res => setPresets(res.data)).catch(console.error);
+        usersApi.getPresets().then(setPresets).catch(console.error);
     }
   }, [selectedUser]);
 
@@ -142,11 +135,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     setActionState('warn', selectedUser.id);
     try {
       const warnTarget = selectedUser.username;
-      await axios.post('/api/warn', {
-        userId: selectedUser.id,
-        points: warnPoints,
-        reason: warnReason
-      });
+      await usersApi.warn(selectedUser.id, warnPoints, warnReason);
       setSelectedUser(null);
       setWarnReason('');
       setWarnPoints(1);
@@ -163,7 +152,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     if (!confirm('Сбросить все наказания для этого пользователя?')) return;
     setActionState('clear', userId);
     try {
-      await axios.post('/api/clear', { userId });
+      await usersApi.clear(userId);
       await refresh();
       triggerFeedback('success', 'Наказания очищены');
     } catch (err) {
@@ -177,7 +166,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     if (!confirm('Отправить пользователю новый QR-код в личные сообщения?')) return;
     setActionState('verify', userId);
     try {
-      await axios.post('/api/verify/send-dm', { userId });
+      await usersApi.sendVerification(userId);
       triggerFeedback('success', 'DM с QR-кодом отправлен');
     } catch (err) {
       triggerFeedback('error', 'Не удалось отправить сообщение с QR-кодом');
@@ -192,8 +181,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
       setGuildsError(null);
       setActionState('guilds', user.id);
       try {
-          const res = await axios.get(`/api/user/${user.id}/guilds`);
-          setUserGuilds(res.data);
+          const data = await usersApi.getUserGuilds(user.id);
+          setUserGuilds(data);
       } catch (err) {
           console.error(err);
           setUserGuilds([]);
@@ -219,8 +208,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     setHistoryError(null);
     setHistoryLoading(true);
     try {
-      const res = await axios.get(`/api/users/${user.id}/warnings`);
-      setHistoryWarnings(res.data.warnings || []);
+      const data = await usersApi.getWarnings(user.id);
+      setHistoryWarnings(data.warnings || []);
     } catch (err) {
       console.error(err);
       setHistoryWarnings([]);
