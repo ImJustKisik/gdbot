@@ -25,10 +25,9 @@ let toxicityClassifier = null;
 
 async function getToxicityClassifier() {
     if (!toxicityClassifier) {
-        console.log("Loading local toxicity model (Xenova/multilingual-toxic-xlm-roberta)...");
+        console.log("Loading local toxicity model (Xenova/toxic-bert)...");
         const { pipeline } = await import('@xenova/transformers');
-        // Using multilingual model for Russian support
-        toxicityClassifier = await pipeline('text-classification', 'Xenova/multilingual-toxic-xlm-roberta');
+        toxicityClassifier = await pipeline('text-classification', 'Xenova/toxic-bert');
         console.log("Local toxicity model loaded.");
     }
     return toxicityClassifier;
@@ -60,25 +59,33 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
     let localScores = "";
     try {
         if (text) {
-            const classifier = await getToxicityClassifier();
-            const results = await classifier(text, { topk: null }); 
-            // results is array of { label: string, score: number }
+            // Check for Cyrillic characters (Russian)
+            const hasCyrillic = /[а-яА-ЯёЁ]/.test(text);
             
-            // Calculate max toxicity score
-            const maxScore = Math.max(...results.map(r => r.score));
+            if (hasCyrillic) {
+                console.log(`[Local AI] Cyrillic detected. Skipping local check, sending to Gemini.`);
+                // We don't return null here, we just skip the local check and proceed to Gemini
+            } else {
+                const classifier = await getToxicityClassifier();
+                const results = await classifier(text, { topk: null }); 
+                // results is array of { label: string, score: number }
+                
+                // Calculate max toxicity score
+                const maxScore = Math.max(...results.map(r => r.score));
 
-            // Filter significant scores
-            const significant = results.filter(r => r.score > 0.01).map(r => `${r.label}: ${(r.score * 100).toFixed(1)}%`);
-            if (significant.length > 0) {
-                localScores = significant.join(", ");
-                console.log(`[Local AI] Scores for "${text.substring(0, 20)}...": ${localScores}`);
-            }
+                // Filter significant scores
+                const significant = results.filter(r => r.score > 0.01).map(r => `${r.label}: ${(r.score * 100).toFixed(1)}%`);
+                if (significant.length > 0) {
+                    localScores = significant.join(", ");
+                    console.log(`[Local AI] Scores for "${text.substring(0, 20)}...": ${localScores}`);
+                }
 
-            // SKIP GEMINI if toxicity is low and no image is present
-            // Threshold: 70% (0.7)
-            if (!imageBuffer && maxScore < 0.7) {
-                console.log(`[AI] Skipping Gemini: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
-                return null;
+                // SKIP GEMINI if toxicity is low and no image is present
+                // Threshold: 70% (0.7)
+                if (!imageBuffer && maxScore < 0.7) {
+                    console.log(`[AI] Skipping Gemini: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
+                    return null;
+                }
             }
         }
     } catch (e) {
