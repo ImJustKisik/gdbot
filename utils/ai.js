@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { pipeline } = require('@xenova/transformers');
 const { GENAI_API_KEYS } = require('./config');
 
 // Initialize models for all keys
@@ -18,6 +19,18 @@ if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
             console.error(`Failed to initialize AI model with key ending in ...${key.slice(-4)}:`, e.message);
         }
     });
+}
+
+// Local Toxicity Model (Lazy loaded)
+let toxicityClassifier = null;
+
+async function getToxicityClassifier() {
+    if (!toxicityClassifier) {
+        console.log("Loading local toxicity model (Xenova/toxic-bert)...");
+        toxicityClassifier = await pipeline('text-classification', 'Xenova/toxic-bert');
+        console.log("Local toxicity model loaded.");
+    }
+    return toxicityClassifier;
 }
 
 // Round-robin counter
@@ -41,6 +54,35 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
     // Log usage stats
     console.log(`[AI LB] Key ${wrapper.id} (${wrapper.keyMask}) | Usage: ${wrapper.usage}`);
     const model = wrapper.instance;
+
+    // Run local toxicity check
+    let localScores = "";
+    try {
+        if (text) {
+            const classifier = await getToxicityClassifier();
+            const results = await classifier(text, { topk: null }); 
+            // results is array of { label: string, score: number }
+            
+            // Calculate max toxicity score
+            const maxScore = Math.max(...results.map(r => r.score));
+
+            // Filter significant scores
+            const significant = results.filter(r => r.score > 0.01).map(r => `${r.label}: ${(r.score * 100).toFixed(1)}%`);
+            if (significant.length > 0) {
+                localScores = significant.join(", ");
+                console.log(`[Local AI] Scores for "${text.substring(0, 20)}...": ${localScores}`);
+            }
+
+            // SKIP GEMINI if toxicity is low and no image is present
+            // Threshold: 70% (0.7)
+            if (!imageBuffer && maxScore < 0.7) {
+                console.log(`[AI] Skipping Gemini: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
+                return null;
+            }
+        }
+    } catch (e) {
+        console.error("Local AI Error:", e);
+    }
 
     try {
         // Правила переписаны слово в слово из вашего скриншота для точности
@@ -112,6 +154,7 @@ ${rules}
 КОНТЕНТ ДЛЯ АНАЛИЗА:
 Текст: "${text || '[Нет текста]'}"
 ${imageBuffer ? '[Приложено изображение]' : ''}
+${localScores ? `\n[ВАЖНО] Локальный анализ токсичности (BERT): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.` : ''}
 
 Ответь ТОЛЬКО JSON объектом:
 { 

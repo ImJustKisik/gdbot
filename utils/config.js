@@ -34,6 +34,7 @@ module.exports = {
     GENAI_API_KEYS: apiKeys, // Export array of keys
     CLIENT_ID: process.env.CLIENT_ID,
     CLIENT_SECRET: process.env.CLIENT_SECRET,
+    PERSPECTIVE_API_KEY: process.env.PERSPECTIVE_API_KEY,
     REDIRECT_URI: process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`,
     NODE_ENV,
     SESSION_SECRET,

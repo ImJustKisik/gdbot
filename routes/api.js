@@ -301,196 +301,22 @@ router.delete('/escalations/:id', requireAuth, (req, res) => {
     }
 });
 
-// 2. System of Punishments (POST /api/warn)
-router.post('/warn', requireAuth, async (req, res) => {
-    const { userId, points, reason } = req.body;
-    const parsedPoints = Number(points);
-    if (!userId || typeof reason !== 'string' || !reason.trim()) return res.status(400).json({ error: 'Missing fields' });
-    if (!Number.isInteger(parsedPoints) || parsedPoints < 1 || parsedPoints > 20) {
-        return res.status(400).json({ error: 'Points must be an integer between 1 and 20' });
-    }
-
+// --- Logs API ---
+router.get('/logs', requireAuth, (req, res) => {
     try {
-        const guild = await getGuild();
-        const member = await fetchGuildMemberSafe(guild, userId);
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+        const type = req.query.type || null;
         
-        if (!member) return res.status(404).json({ error: 'User not found in guild' });
-
-        // Update DB
-        const warning = {
-            reason,
-            points: parsedPoints,
-            date: new Date().toISOString(),
-            moderator: req.session.user.username
-        };
-        db.addWarning(userId, warning);
-        
-        // Fetch updated user for response logic
-        const user = db.getUser(userId);
-
-        // Log Action (Background)
-        logAction(guild, 'User Warned', `User <@${userId}> was warned by ${req.session.user.username}`, 'Orange', [
-            { name: 'Reason', value: reason },
-            { name: 'Points', value: `+${parsedPoints} (Total: ${user.points})` }
-        ]).catch(console.error);
-
-        // Discord Action: Send DM (Background)
-        const dmPromise = (async () => {
-            try {
-                const embed = new EmbedBuilder()
-                    .setTitle('You have been warned')
-                    .setColor('Orange')
-                    .addFields(
-                        { name: 'Reason', value: reason },
-                        { name: 'Points Added', value: parsedPoints.toString() },
-                        { name: 'Total Points', value: user.points.toString() }
-                    );
-                await member.send({ embeds: [embed] });
-            } catch (dmError) {
-                console.log(`Could not DM user ${userId}`);
-            }
-        })();
-
-        // Auto-Mute / Escalation Rule
-        let actionTaken = 'Warned';
-        
-        const escalations = db.getEscalations();
-        const activeRule = escalations
-            .sort((a, b) => b.threshold - a.threshold)
-            .find(rule => user.points >= rule.threshold);
-
-        const defaultAutoMuteThreshold = Number(getAppSetting('autoMuteThreshold')) || 0;
-        const defaultAutoMuteDuration = Number(getAppSetting('autoMuteDuration')) || 60;
-        const shouldApplyFallbackMute = !activeRule && defaultAutoMuteThreshold > 0 && user.points >= defaultAutoMuteThreshold;
-
-        if (activeRule) {
-            if (member.moderatable) {
-                try {
-                    if (activeRule.action === 'mute') {
-                        const duration = activeRule.duration || 60;
-                        await member.timeout(duration * 60 * 1000, `Auto-punish: Reached ${activeRule.threshold} points`);
-                        actionTaken = `Warned & Auto-Muted (${duration}m)`;
-                        
-                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
-                            { name: 'Action', value: 'Mute' },
-                            { name: 'Duration', value: `${duration} minutes` }
-                        ]).catch(console.error);
-
-                        dmPromise.then(async () => {
-                            try { await member.send(`You have been automatically muted for ${duration} minutes due to reaching ${activeRule.threshold} penalty points.`); } catch (e) {}
-                        });
-
-                    } else if (activeRule.action === 'kick') {
-                        await member.kick(`Auto-punish: Reached ${activeRule.threshold} points`);
-                        actionTaken = `Warned & Auto-Kicked`;
-                        
-                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
-                            { name: 'Action', value: 'Kick' }
-                        ]).catch(console.error);
-
-                    } else if (activeRule.action === 'ban') {
-                        await member.ban({ reason: `Auto-punish: Reached ${activeRule.threshold} points` });
-                        actionTaken = `Warned & Auto-Banned`;
-                        
-                        logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached ${activeRule.threshold} points.`, 'Red', [
-                            { name: 'Action', value: 'Ban' }
-                        ]).catch(console.error);
-                    }
-                } catch (err) {
-                    console.error('Auto-punish failed:', err);
-                    actionTaken = `Warned (Auto-${activeRule.action} failed: Missing permissions)`;
-                }
-            } else {
-                actionTaken = `Warned (Auto-${activeRule.action} failed: User not moderatable)`;
-            }
-        } else if (shouldApplyFallbackMute) {
-            if (member.moderatable) {
-                const duration = Math.max(1, defaultAutoMuteDuration);
-                try {
-                    await member.timeout(duration * 60 * 1000, `Auto-punish (default): Reached ${defaultAutoMuteThreshold} points`);
-                    actionTaken = `Warned & Auto-Muted (${duration}m)`;
-
-                    logAction(guild, 'Auto-Punishment Triggered', `User <@${userId}> reached the default ${defaultAutoMuteThreshold} point threshold.`, 'Red', [
-                        { name: 'Action', value: 'Mute (Default Rule)' },
-                        { name: 'Duration', value: `${duration} minutes` }
-                    ]).catch(console.error);
-
-                    dmPromise.then(async () => {
-                        try { await member.send(`You have been automatically muted for ${duration} minutes due to reaching ${defaultAutoMuteThreshold} penalty points.`); } catch (e) {}
-                    });
-                } catch (err) {
-                    console.error('Default auto-mute failed:', err);
-                    actionTaken = 'Warned (Default auto-mute failed: Missing permissions)';
-                }
-            } else {
-                actionTaken = 'Warned (Default auto-mute failed: User not moderatable)';
-            }
-        }
-
-        res.json({ success: true, user, action: actionTaken });
-
+        const logs = db.getLogs(limit, offset, type);
+        res.json(logs);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Failed to fetch logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
     }
 });
 
-// 3. Clear Punishments (POST /api/clear)
-router.post('/clear', requireAuth, async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-    try {
-    const guild = await getGuild();
-    const member = await fetchGuildMemberSafe(guild, userId);
-
-        // Reset DB
-        const user = db.getUser(userId);
-        const oldPoints = user.points;
-        
-        db.clearPunishments(userId);
-
-        // Log (Background)
-        logAction(guild, 'Punishments Cleared', `User <@${userId}> punishments were cleared by ${req.session.user.username}`, 'Green', [
-            { name: 'Points Removed', value: oldPoints.toString() }
-        ]).catch(console.error);
-
-        // Remove Timeout (Critical - Await)
-        if (member && member.moderatable && member.communicationDisabledUntilTimestamp > Date.now()) {
-            await member.timeout(null, 'Punishments cleared by admin');
-        }
-
-        res.json({ success: true, message: 'User record cleared' });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// 4. Verification (POST /api/verify/send-dm)
-router.post('/verify/send-dm', requireAuth, async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-    try {
-    const guild = await getGuild();
-    const member = await fetchGuildMemberSafe(guild, userId);
-    if (!member) return res.status(404).json({ error: 'User not found' });
-
-        // Use the helper function to ensure consistency and include state
-        const messagePayload = await generateVerificationMessage(userId);
-        await member.send(messagePayload);
-
-        res.json({ success: true, message: 'Verification DM sent' });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to send verification DM' });
-    }
-});
-
-// 5. Analytics (GET /api/stats)
+// --- Stats API ---
 router.get('/stats/guilds', requireAuth, (req, res) => {
     try {
         const stats = db.getGuildStats();

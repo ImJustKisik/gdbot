@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
 import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
+import { LogsView } from './components/LogsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { User } from './types';
 import { authApi } from './api/auth';
@@ -200,6 +201,16 @@ function App() {
             <Settings size={20} />
             Settings
           </Link>
+          <Link 
+            to="/logs"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              location.pathname === '/logs' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <List size={20} />
+            Audit Logs
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100">
@@ -246,6 +257,7 @@ function App() {
           } />
           <Route path="/verification" element={<VerificationView />} />
           <Route path="/settings" element={<SettingsView />} />
+          <Route path="/logs" element={<LogsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

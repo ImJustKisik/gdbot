@@ -75,6 +75,14 @@ async function logAction(guild, title, description, color = 'Blue', fields = [],
     // Red/Orange usually implies moderation action
     const isModAction = ['Red', 'Orange'].includes(color) || title.includes('Warn') || title.includes('Punish') || title.includes('Mute') || title.includes('Ban') || title.includes('Kick');
     
+    // Save to Database for Dashboard
+    try {
+        const type = isModAction ? 'moderation' : (title.includes('Verify') ? 'verify' : 'system');
+        db.addLog(type, title, description, color, fields, imageUrl);
+    } catch (e) {
+        console.error('Failed to save log to DB:', e);
+    }
+
     let targetChannelId = getAppSetting('logChannelId');
     
     if (isModAction) {

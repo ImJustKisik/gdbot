@@ -52,8 +52,20 @@ db.exec(`
     duration INTEGER -- minutes (only for mute)
   );
 
+  CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT, -- 'warn', 'mute', 'ban', 'kick', 'verify', 'system'
+    title TEXT,
+    description TEXT,
+    color TEXT,
+    fields TEXT, -- JSON string
+    image_url TEXT,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE INDEX IF NOT EXISTS idx_warnings_user_id ON warnings(user_id);
   CREATE INDEX IF NOT EXISTS idx_users_points ON users_v2(points DESC);
+  CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC);
 `);
 
 // --- Migrations ---
@@ -401,9 +413,39 @@ module.exports = {
         return db.prepare('INSERT INTO escalations (name, threshold, action, duration) VALUES (?, ?, ?, ?)').run(name || 'Rule', threshold, action, duration);
     },
     deleteEscalation: (id) => {
-        db.prepare('DELETE FROM escalations WHERE id = ?').run(id);
+        const stmt = db.prepare('DELETE FROM escalations WHERE id = ?');
+        stmt.run(id);
     },
-    
+
+    addLog: (type, title, description, color, fields = [], imageUrl = null) => {
+        const stmt = db.prepare(`
+            INSERT INTO logs (type, title, description, color, fields, image_url)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        stmt.run(type, title, description, color, JSON.stringify(fields), imageUrl);
+    },
+
+    getLogs: (limit = 100, offset = 0, type = null) => {
+        let query = 'SELECT * FROM logs';
+        const params = [];
+        
+        if (type) {
+            query += ' WHERE type = ?';
+            params.push(type);
+        }
+        
+        query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+        params.push(limit, offset);
+        
+        const stmt = db.prepare(query);
+        const logs = stmt.all(...params);
+        
+        return logs.map(log => ({
+            ...log,
+            fields: JSON.parse(log.fields || '[]')
+        }));
+    },
+
     // Deprecated but kept for safety if I missed something
     getAllUsers: () => {
         console.warn("Deprecated db.getAllUsers() called. Use getUsersSummary() instead.");
