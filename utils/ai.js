@@ -29,7 +29,10 @@ const pendingRequests = new Map(); // id -> resolve/reject
 
 function startPythonBridge() {
     console.log("[AI Bridge] Starting Python Detoxify service...");
-    pythonProcess = spawn('python', ['toxicity_server.py'], {
+    // Try python3 first (standard on Linux), fallback to python (Windows)
+    const command = process.platform === 'win32' ? 'python' : 'python3';
+    
+    pythonProcess = spawn(command, ['toxicity_server.py'], {
         cwd: path.join(__dirname, '..'),
         stdio: ['pipe', 'pipe', 'pipe']
     });
