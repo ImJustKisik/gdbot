@@ -4,9 +4,10 @@ import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History, Re
 import { usersApi, Guild } from '../api/users';
 import { settingsApi } from '../api/settings';
 
-const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted'; label: string }[] = [
+const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted' | 'unverified'; label: string }[] = [
   { value: 'all', label: 'Все' },
   { value: 'verified', label: 'Проверенные' },
+  { value: 'unverified', label: 'Не проверенные' },
   { value: 'muted', label: 'Замьюченные' },
 ];
 
@@ -36,7 +37,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
   
   const [presets, setPresets] = useState<{id: number, name: string, points: number}[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'muted'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'muted' | 'unverified'>('all');
   const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -243,6 +244,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
         result = result.filter(user => user.status === 'Verified');
       } else if (statusFilter === 'muted') {
         result = result.filter(user => user.status === 'Muted');
+      } else if (statusFilter === 'unverified') {
+        result = result.filter(user => user.status === 'Unverified');
       }
     }
 
@@ -487,7 +490,9 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 </td>
                 <td className="p-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    user.status === 'Verified' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    user.status === 'Verified' ? 'bg-green-100 text-green-700' : 
+                    user.status === 'Muted' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
                   }`}>
                     {user.status}
                   </span>

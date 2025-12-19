@@ -12,5 +12,5 @@ export interface User {
   points: number;
   warningsCount: number;
   warnings?: Warning[];
-  status: 'Verified' | 'Muted';
+  status: 'Verified' | 'Muted' | 'Unverified';
 }

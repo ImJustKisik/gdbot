@@ -67,9 +67,28 @@ router.get('/users', requireAuth, async (req, res) => {
             const localUser = localUsers[member.id] || { points: 0, warningsCount: 0 };
             
             // Determine status
-            let status = 'Verified'; // Default
-            if (member.roles.cache.some(role => role.name === 'Muted') || member.communicationDisabledUntilTimestamp > Date.now()) {
+            let status = 'Unverified'; // Default to Unverified
+            
+            const roleVerifiedName = getAppSetting('roleVerified') || 'Verified';
+            const roleUnverifiedName = getAppSetting('roleUnverified') || 'Unverified';
+
+            const hasVerifiedRole = member.roles.cache.some(r => r.name === roleVerifiedName || r.id === roleVerifiedName);
+            const hasUnverifiedRole = member.roles.cache.some(r => r.name === roleUnverifiedName || r.id === roleUnverifiedName);
+            const isMuted = member.roles.cache.some(role => role.name === 'Muted') || member.communicationDisabledUntilTimestamp > Date.now();
+
+            if (isMuted) {
                 status = 'Muted';
+            } else if (hasVerifiedRole) {
+                status = 'Verified';
+            } else if (hasUnverifiedRole) {
+                status = 'Unverified';
+            } else {
+                // Fallback logic: if no roles match, assume Verified if they don't have the Unverified role explicitly
+                // Or keep as Unverified if you want strict checking.
+                // Let's assume if they are in the DB as verified (oauth table), they are verified.
+                if (localUser.verifiedAt) {
+                    status = 'Verified';
+                }
             }
             
             return {
