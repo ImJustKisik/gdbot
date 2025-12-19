@@ -54,8 +54,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const RISK_FILTERS: { value: 'all' | 'low' | 'medium' | 'high'; label: string }[] = [
     { value: 'all', label: 'Все уровни' },
     { value: 'low', label: `< ${Math.floor(maxPoints / 2)} pts` },
-    { value: 'medium', label: `${Math.floor(maxPoints / 2)}-${maxPoints - 1} pts` },
-    { value: 'high', label: `${maxPoints}+ pts` },
+    { value: 'medium', label: `${Math.floor(maxPoints / 2)}-${Math.floor(maxPoints * 0.75) - 1} pts` },
+    { value: 'high', label: `${Math.floor(maxPoints * 0.75)}+ pts` },
   ];
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   };
 
   const getRiskLevel = (points: number): 'low' | 'medium' | 'high' => {
-    if (points >= maxPoints) return 'high';
+    if (points >= Math.floor(maxPoints * 0.75)) return 'high';
     if (points >= Math.floor(maxPoints / 2)) return 'medium';
     return 'low';
   };
