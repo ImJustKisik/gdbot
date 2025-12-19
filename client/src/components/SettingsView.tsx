@@ -4,6 +4,7 @@ import { settingsApi, Settings, Preset, Escalation, SelectOption } from '../api/
 
 const INITIAL_SETTINGS: Settings = {
     logChannelId: '',
+    modLogChannelId: '',
     verificationChannelId: '',
     roleUnverified: '',
     roleVerified: '',

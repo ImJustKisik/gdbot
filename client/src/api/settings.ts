@@ -2,6 +2,7 @@ import api from './client';
 
 export interface Settings {
   logChannelId: string;
+  modLogChannelId: string;
   verificationChannelId: string;
   roleUnverified: string;
   roleVerified: string;

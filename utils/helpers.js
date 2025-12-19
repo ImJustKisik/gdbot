@@ -71,10 +71,20 @@ function getConfiguredRole(guild, settingKey) {
 }
 
 async function logAction(guild, title, description, color = 'Blue', fields = []) {
-    const logChannelId = getAppSetting('logChannelId');
-    if (!logChannelId) return;
+    // Determine channel type based on color/title context
+    // Red/Orange usually implies moderation action
+    const isModAction = ['Red', 'Orange'].includes(color) || title.includes('Warn') || title.includes('Punish') || title.includes('Mute') || title.includes('Ban') || title.includes('Kick');
+    
+    let targetChannelId = getAppSetting('logChannelId');
+    
+    if (isModAction) {
+        const modLogId = getAppSetting('modLogChannelId');
+        if (modLogId) targetChannelId = modLogId;
+    }
 
-    const channel = guild.channels.cache.get(logChannelId);
+    if (!targetChannelId) return;
+
+    const channel = guild.channels.cache.get(targetChannelId);
     if (!channel) return;
 
     const embed = new EmbedBuilder()

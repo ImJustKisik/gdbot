@@ -41,6 +41,7 @@ module.exports = {
     VERIFICATION_CHANNEL_NAME: "verification",
     DEFAULT_SETTINGS: {
         logChannelId: "",
+        modLogChannelId: "", // New channel for warnings/punishments
         verificationChannelId: "",
         autoMuteThreshold: 20,
         autoMuteDuration: 60, // minutes

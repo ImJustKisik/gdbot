@@ -168,6 +168,7 @@ router.post('/settings', requireAuth, async (req, res) => {
 
         const normalized = {};
         const logChannelId = normalizeChannelSetting(guild, payload.logChannelId, 'Log Channel');
+        const modLogChannelId = normalizeChannelSetting(guild, payload.modLogChannelId, 'Mod Log Channel');
         const verificationChannelId = normalizeChannelSetting(guild, payload.verificationChannelId, 'Verification Channel');
         const roleUnverified = normalizeRoleSetting(guild, payload.roleUnverified, 'Unverified Role');
         const roleVerified = normalizeRoleSetting(guild, payload.roleVerified, 'Verified Role');
@@ -188,6 +189,7 @@ router.post('/settings', requireAuth, async (req, res) => {
         };
 
         if (logChannelId !== undefined) normalized.logChannelId = logChannelId;
+        if (modLogChannelId !== undefined) normalized.modLogChannelId = modLogChannelId;
         if (verificationChannelId !== undefined) normalized.verificationChannelId = verificationChannelId;
         if (roleUnverified !== undefined) normalized.roleUnverified = roleUnverified;
         if (roleVerified !== undefined) normalized.roleVerified = roleVerified;
