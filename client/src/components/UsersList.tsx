@@ -2,18 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { User, Warning } from '../types';
 import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History, RefreshCw, Users, ShieldCheck, X, Loader2, Inbox } from 'lucide-react';
 import { usersApi, Guild } from '../api/users';
+import { settingsApi } from '../api/settings';
 
 const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted'; label: string }[] = [
   { value: 'all', label: 'Все' },
   { value: 'verified', label: 'Проверенные' },
   { value: 'muted', label: 'Замьюченные' },
-];
-
-const RISK_FILTERS: { value: 'all' | 'low' | 'medium' | 'high'; label: string }[] = [
-  { value: 'all', label: 'Все уровни' },
-  { value: 'low', label: '< 10 pts' },
-  { value: 'medium', label: '10-19 pts' },
-  { value: 'high', label: '20+ pts' },
 ];
 
 type ActionType = 'warn' | 'clear' | 'verify' | 'guilds';
@@ -47,6 +41,22 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<{ type: ActionType; userId?: string } | null>(null);
+  const [maxPoints, setMaxPoints] = useState(20);
+
+  useEffect(() => {
+    settingsApi.getBundle().then(data => {
+      if (data.settings?.autoMuteThreshold) {
+        setMaxPoints(data.settings.autoMuteThreshold);
+      }
+    }).catch(console.error);
+  }, []);
+
+  const RISK_FILTERS: { value: 'all' | 'low' | 'medium' | 'high'; label: string }[] = [
+    { value: 'all', label: 'Все уровни' },
+    { value: 'low', label: `< ${Math.floor(maxPoints / 2)} pts` },
+    { value: 'medium', label: `${Math.floor(maxPoints / 2)}-${maxPoints - 1} pts` },
+    { value: 'high', label: `${maxPoints}+ pts` },
+  ];
 
   useEffect(() => {
     if (selectedUser) {
@@ -65,10 +75,10 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     const verified = users.filter(user => user.status === 'Verified').length;
     const muted = users.filter(user => user.status === 'Muted').length;
     const unverified = Math.max(0, total - verified);
-    const highRisk = users.filter(user => user.points >= 15).length;
+    const highRisk = users.filter(user => user.points >= Math.floor(maxPoints * 0.75)).length;
 
     return { total, verified, unverified, muted, highRisk };
-  }, [users]);
+  }, [users, maxPoints]);
 
   const riskMeta: Record<'low' | 'medium' | 'high', { label: string; badgeClass: string }> = {
     low: { label: 'Низкий риск', badgeClass: 'bg-emerald-100 text-emerald-700' },
@@ -77,8 +87,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   };
 
   const getRiskLevel = (points: number): 'low' | 'medium' | 'high' => {
-    if (points >= 20) return 'high';
-    if (points >= 10) return 'medium';
+    if (points >= maxPoints) return 'high';
+    if (points >= Math.floor(maxPoints / 2)) return 'medium';
     return 'low';
   };
 
@@ -430,7 +440,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 onClick={() => handleSort('points')}
               >
                 <div className="flex items-center gap-2">
-                  Points (Max 20)
+                  Points (Max {maxPoints})
                   <ArrowUpDown size={14} />
                 </div>
               </th>
@@ -488,14 +498,14 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                       <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className={`h-full ${getProgressColor(user.points)} transition-all duration-500`}
-                          style={{ width: `${Math.min(100, (user.points / 20) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (user.points / maxPoints) * 100)}%` }}
                         />
                       </div>
                       <span className="text-sm text-gray-600 w-8 text-right font-semibold">{user.points}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       {renderRiskBadge(user.points)}
-                      <span className="text-xs text-gray-400">макс. 20</span>
+                      <span className="text-xs text-gray-400">макс. {maxPoints}</span>
                     </div>
                   </div>
                 </td>
