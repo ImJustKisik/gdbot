@@ -1,5 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { GENAI_API_KEYS } = require('./config');
+const { spawn } = require('child_process');
+const path = require('path');
 
 // Initialize models for all keys
 const models = [];
@@ -20,28 +22,79 @@ if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
     });
 }
 
-// Local Models (Lazy loaded)
-let toxicityClassifier = null;
-let sentimentClassifier = null;
+// --- Python Detoxify Bridge ---
+let pythonProcess = null;
+let pythonReady = false;
+const pendingRequests = new Map(); // id -> resolve/reject
 
-async function getToxicityClassifier() {
-    if (!toxicityClassifier) {
-        console.log("Loading local toxicity model (Xenova/toxic-bert)...");
-        const { pipeline } = await import('@xenova/transformers');
-        toxicityClassifier = await pipeline('text-classification', 'Xenova/toxic-bert');
-        console.log("Local toxicity model loaded.");
-    }
-    return toxicityClassifier;
+function startPythonBridge() {
+    console.log("[AI Bridge] Starting Python Detoxify service...");
+    pythonProcess = spawn('python', ['toxicity_server.py'], {
+        cwd: path.join(__dirname, '..'),
+        stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    pythonProcess.stdout.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const msg = JSON.parse(line);
+                if (msg.status === 'loading') {
+                    console.log(`[AI Bridge] ${msg.message}`);
+                } else if (msg.status === 'ready') {
+                    console.log(`[AI Bridge] ${msg.message}`);
+                    pythonReady = true;
+                } else if (msg.status === 'error') {
+                    console.error(`[AI Bridge] Error: ${msg.message}`);
+                } else if (msg.status === 'ok' && pendingRequests.has('latest')) {
+                    // Simple single-request handling for now (since we process messages sequentially mostly)
+                    // Ideally we'd use IDs, but for simplicity we'll just resolve the last pending
+                    const resolver = pendingRequests.get('latest');
+                    resolver(msg.results);
+                    pendingRequests.delete('latest');
+                }
+            } catch (e) {
+                console.error(`[AI Bridge] Failed to parse JSON: ${line}`, e);
+            }
+        }
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`[AI Bridge Stderr] ${data}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`[AI Bridge] Process exited with code ${code}`);
+        pythonReady = false;
+        pythonProcess = null;
+        // Auto-restart after delay
+        setTimeout(startPythonBridge, 5000);
+    });
 }
 
-async function getSentimentClassifier() {
-    if (!sentimentClassifier) {
-        console.log("Loading local sentiment model (Xenova/bert-base-multilingual-uncased-sentiment)...");
-        const { pipeline } = await import('@xenova/transformers');
-        sentimentClassifier = await pipeline('text-classification', 'Xenova/bert-base-multilingual-uncased-sentiment');
-        console.log("Local sentiment model loaded.");
-    }
-    return sentimentClassifier;
+// Start the bridge
+startPythonBridge();
+
+async function getToxicityScores(text) {
+    if (!pythonReady || !pythonProcess) return null;
+    
+    return new Promise((resolve, reject) => {
+        // Store resolver
+        pendingRequests.set('latest', resolve);
+        
+        // Send request
+        const payload = JSON.stringify({ text }) + '\n';
+        pythonProcess.stdin.write(payload);
+        
+        // Timeout
+        setTimeout(() => {
+            if (pendingRequests.has('latest')) {
+                pendingRequests.delete('latest');
+                resolve(null); // Timeout
+            }
+        }, 3000);
+    });
 }
 
 // Round-robin counter
@@ -66,60 +119,34 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
     console.log(`[AI LB] Key ${wrapper.id} (${wrapper.keyMask}) | Usage: ${wrapper.usage}`);
     const model = wrapper.instance;
 
-    // Run local toxicity check
+    // Run local toxicity check (Python Detoxify)
     let localScores = "";
     try {
         if (text) {
-            // Check for Cyrillic characters (Russian)
-            const hasCyrillic = /[а-яА-ЯёЁ]/.test(text);
+            const scores = await getToxicityScores(text);
             
-            if (hasCyrillic) {
-                // Use Sentiment Analysis for Russian
-                // 1 star / 2 stars = Negative (Potential Toxicity)
-                // 3 stars = Neutral
-                // 4 stars / 5 stars = Positive
-                try {
-                    const classifier = await getSentimentClassifier();
-                    const results = await classifier(text);
-                    // Example result: [{ label: '1 star', score: 0.95 }]
-                    const topResult = results[0];
-                    
-                    console.log(`[Local AI] Sentiment for "${text.substring(0, 20)}...": ${topResult.label} (${(topResult.score * 100).toFixed(1)}%)`);
-
-                    const isNegative = ['1 star', '2 stars'].includes(topResult.label);
-                    
-                    if (isNegative) {
-                        localScores = `Sentiment: ${topResult.label}`;
-                    } else if (!imageBuffer) {
-                        // If sentiment is Neutral/Positive (3-5 stars) and no image -> Skip Gemini
-                        console.log(`[AI] Skipping Gemini: Sentiment is ${topResult.label} (Not Negative)`);
-                        return null;
-                    }
-                } catch (e) {
-                    console.error("Local Sentiment AI Error:", e);
-                    // Fallback to Gemini on error
-                }
-            } else {
-                const classifier = await getToxicityClassifier();
-                const results = await classifier(text, { topk: null }); 
-                // results is array of { label: string, score: number }
+            if (scores) {
+                // scores: { toxicity: 0.9, severe_toxicity: 0.1, ... }
+                const maxScore = Math.max(...Object.values(scores));
                 
-                // Calculate max toxicity score
-                const maxScore = Math.max(...results.map(r => r.score));
-
-                // Filter significant scores
-                const significant = results.filter(r => r.score > 0.01).map(r => `${r.label}: ${(r.score * 100).toFixed(1)}%`);
-                if (significant.length > 0) {
-                    localScores = significant.join(", ");
-                    console.log(`[Local AI] Scores for "${text.substring(0, 20)}...": ${localScores}`);
+                // Format significant scores
+                const significant = Object.entries(scores)
+                    .filter(([k, v]) => v > 0.01)
+                    .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
+                    .join(", ");
+                
+                if (significant) {
+                    localScores = significant;
+                    console.log(`[Detoxify] Scores for "${text.substring(0, 20)}...": ${localScores}`);
                 }
 
-                // SKIP GEMINI if toxicity is low and no image is present
-                // Threshold: 70% (0.7)
+                // SKIP GEMINI if toxicity is low (< 70%) and no image
                 if (!imageBuffer && maxScore < 0.7) {
                     console.log(`[AI] Skipping Gemini: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
                     return null;
                 }
+            } else {
+                console.log("[Detoxify] No response or timeout. Proceeding to Gemini.");
             }
         }
     } catch (e) {
@@ -196,7 +223,7 @@ ${rules}
 КОНТЕНТ ДЛЯ АНАЛИЗА:
 Текст: "${text || '[Нет текста]'}"
 ${imageBuffer ? '[Приложено изображение]' : ''}
-${localScores ? `\n[ВАЖНО] Локальный анализ токсичности (BERT): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.` : ''}
+${localScores ? `\n[ВАЖНО] Локальный анализ токсичности (Detoxify): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.` : ''}
 
 Ответь ТОЛЬКО JSON объектом:
 { 
