@@ -104,31 +104,21 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
         return null;
     }
 
-    // Log usage stats
-    console.log(`[AI LB] Using key ...${apiKey.slice(-4)}`);
-
-    // Run local toxicity check (Python Detoxify)
+    // Локальная проверка Detoxify
     let localScores = "";
     try {
         if (text) {
             const scores = await getToxicityScores(text);
-            
             if (scores) {
-                // scores: { toxicity: 0.9, severe_toxicity: 0.1, ... }
                 const maxScore = Math.max(...Object.values(scores));
-                
-                // Format significant scores
                 const significant = Object.entries(scores)
                     .filter(([k, v]) => v > 0.01)
                     .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
                     .join(", ");
-                
                 if (significant) {
                     localScores = significant;
                     console.log(`[Detoxify] Scores for "${text.substring(0, 20)}...": ${localScores}`);
                 }
-
-                // SKIP AI if toxicity is low (< 70%) and no image
                 if (!imageBuffer && maxScore < 0.7) {
                     console.log(`[AI] Skipping OpenRouter: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
                     return null;
@@ -141,9 +131,43 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
         console.error("Local AI Error:", e);
     }
 
+    // --- Разделение логики для текста и изображений ---
     try {
-        // Правила переписаны слово в слово из вашего скриншота для точности
-        const rules = `
+        if (imageBuffer && mimeType) {
+            // Проверка изображения через Gemini (или LLaVA)
+            const imageModel = "google/gemini-2.0-flash-lite-preview-02-05:free"; // или другую подходящую
+            const systemPrompt = "Ты — Lusty Xeno, ИИ-страж Discord. Проверь изображение на NSFW, экстремизм, политику, метагейминг. Ответь ТОЛЬКО JSON: { violation: boolean, reason: string, severity: number, comment: string }";
+            const userContent = [
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBuffer.toString('base64')}` } }
+            ];
+            if (text) {
+                userContent.push({ type: "text", text: `Текст: \"${text}\"` });
+            }
+            if (localScores) {
+                userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
+            }
+            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+                model: imageModel,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userContent }
+                ]
+            }, {
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://discord.com",
+                    "X-Title": "Discord Guardian Bot"
+                }
+            });
+            const content = response.data.choices[0].message.content;
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            const jsonStr = jsonMatch ? jsonMatch[0] : content;
+            return JSON.parse(jsonStr);
+        } else {
+            // Проверка текста через deepseek-r1t2-chimera
+            // ...оставляем текущую логику...
+            const rules = `
 Общие правила:
 0. Не будьте мудаком.
 1. Участники обязаны соблюдать правила вне зависимости от ролей.
@@ -166,8 +190,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
 4. Запрещена пропаганда нацизма, фашизма, экстремизма.
 4.1. ПОЛИТИКА: Запрещены любые обсуждения текущих политических событий и провокации на эту тему.
 `;
-
-        const systemPrompt = `
+            const systemPrompt = `
 Ты — Lusty Xeno, ИИ-страж игрового Discord сервера. Твоя задача — защищать чат от реальной грязи, политики и сливов игры, но не душнить за локальные мемы.
 
 ГЛАВНЫЕ ПРИОРИТЕТЫ (УРОВНИ УГРОЗЫ):
@@ -216,53 +239,36 @@ ${rules}
     "comment": "string (Комментарий в стиле Lusty Xeno: строгий, но справедливый. Заполнять ТОЛЬКО если violation=true)" 
 }`;
 
-        const userContent = [
-            { type: "text", text: `Текст: "${text || '[Нет текста]'}"` }
-        ];
-
-        if (imageBuffer && mimeType) {
-            userContent.push({
-                type: "image_url",
-                image_url: {
-                    url: `data:${mimeType};base64,${imageBuffer.toString('base64')}`
+            const userContent = [
+                { type: "text", text: `Текст: "${text || '[Нет текста]'}"` }
+            ];
+            if (localScores) {
+                userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
+            }
+            const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+                model: "tngtech/deepseek-r1t2-chimera:free",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userContent }
+                ]
+            }, {
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://discord.com",
+                    "X-Title": "Discord Guardian Bot"
                 }
             });
+            const content = response.data.choices[0].message.content;
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            const jsonStr = jsonMatch ? jsonMatch[0] : content;
+            return JSON.parse(jsonStr);
         }
-        
-        if (localScores) {
-            userContent.push({
-                type: "text",
-                text: `\n[ВАЖНО] Локальный анализ токсичности (Detoxify): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.`
-            });
-        }
-
-        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: "tngtech/deepseek-r1t2-chimera:free",
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userContent }
-            ]
-        }, {
-            headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://discord.com", // Optional
-                "X-Title": "Discord Guardian Bot" // Optional
-            }
-        });
-
-        const content = response.data.choices[0].message.content;
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : content;
-        
-        return JSON.parse(jsonStr);
-
     } catch (error) {
         console.error("AI Error:", error.response?.data || error.message);
-        // Simple retry logic: if one key fails, try the next one immediately
         if (apiKeys.length > 1) {
             console.log("Retrying with next API key...");
-            return analyzeContent(text, imageBuffer, mimeType); 
+            return analyzeContent(text, imageBuffer, mimeType);
         }
         return null;
     }
