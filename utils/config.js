@@ -38,8 +38,8 @@ module.exports = {
     REDIRECT_URI: process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`,
     NODE_ENV,
     SESSION_SECRET,
-    SENTRY_DSN: process.env.SENTRY_DSN,
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    SENTRY_DSN: process.env.SENTRY_DSN,
     VERIFICATION_CHANNEL_NAME: "verification",
     DEFAULT_SETTINGS: {
         logChannelId: "",

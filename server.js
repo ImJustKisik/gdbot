@@ -5,7 +5,7 @@ const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
-const { PORT, SESSION_SECRET, REDIRECT_URI } = require('./utils/config');
+const { PORT, SESSION_SECRET, REDIRECT_URI, SENTRY_DSN } = require('./utils/config');
 const { startBot, client } = require('./bot'); // Imports from bot/index.js
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
@@ -13,7 +13,7 @@ const apiRoutes = require('./routes/api');
 const app = express();
 
 Sentry.init({
-  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",
+  dsn: SENTRY_DSN,
   integrations: [
     nodeProfilingIntegration(),
   ],
