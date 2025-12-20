@@ -1,35 +1,27 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+const Sentry = require('@sentry/node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
-const { PORT, SESSION_SECRET, REDIRECT_URI, SENTRY_DSN } = require('./utils/config');
+const { PORT, SESSION_SECRET, REDIRECT_URI } = require('./utils/config');
 const { startBot, client } = require('./bot'); // Imports from bot/index.js
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 
-// Initialize Sentry
-if (Sentry_DSN) {
-    Sentry.init({
-        dsn: SENTRY_DSN,
-        integrations: [
-            nodeProfilingIntegration(),
-        ],
-        tracesSampleRate: 1.0,
-        profilesSampleRate: 1.0,
-    });
-    console.log('Sentry initialized.');
-}
-
 const app = express();
 
-// Sentry Request Handler must be the first middleware on the app
-if (Sentry_DSN) {
-    app.use(Sentry.Handlers.requestHandler());
-    app.use(Sentry.Handlers.tracingHandler());
-}
+Sentry.init({
+  dsn: "https://examplePublicKey@o0.ingest.sentry.io/0",
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  // Tracing
+  tracesSampleRate: 1.0, //  Capture 100% of the transactions
+  // Set sampling rate for profiling - this is relative to tracesSampleRate
+  profilesSampleRate: 1.0,
+});
 
 // --- Middleware ---
 app.set('trust proxy', 1); // Trust Nginx proxy (required for secure cookies behind proxy)
