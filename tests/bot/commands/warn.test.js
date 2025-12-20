@@ -43,6 +43,8 @@ describe('Command: /warn', () => {
                 getUser: jest.fn().mockReturnValue({ id: 'target-id', tag: 'Target#0000' }),
                 getString: jest.fn(),
                 getInteger: jest.fn(),
+                getAttachment: jest.fn(),
+                getBoolean: jest.fn(),
                 getFocused: jest.fn()
             }
         };

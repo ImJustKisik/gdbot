@@ -40,6 +40,8 @@ describe('Command /warn edge cases', () => {
         getUser: jest.fn().mockReturnValue({ id: 'target', tag: 'Target#0000' }),
         getString: jest.fn().mockImplementation(name => (name === 'reason' ? 'Spam' : null)),
         getInteger: jest.fn().mockReturnValue(5),
+        getAttachment: jest.fn(),
+        getBoolean: jest.fn(),
         getFocused: jest.fn(),
       },
     };

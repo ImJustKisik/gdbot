@@ -2,6 +2,7 @@ const axios = require('axios');
 const { GENAI_API_KEYS, IMAGE_API_KEY } = require('./config');
 const { spawn } = require('child_process');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 // Initialize keys
 const apiKeys = GENAI_API_KEYS || [];
@@ -51,12 +52,12 @@ function startPythonBridge() {
                     pythonReady = true;
                 } else if (msg.status === 'error') {
                     console.error(`[AI Bridge] Error: ${msg.message}`);
-                } else if (msg.status === 'ok' && pendingRequests.has('latest')) {
-                    // Simple single-request handling for now (since we process messages sequentially mostly)
-                    // Ideally we'd use IDs, but for simplicity we'll just resolve the last pending
-                    const resolver = pendingRequests.get('latest');
-                    resolver(msg.results);
-                    pendingRequests.delete('latest');
+                } else if (msg.status === 'ok' && msg.id) {
+                    const resolver = pendingRequests.get(msg.id);
+                    if (resolver) {
+                        resolver(msg.results);
+                        pendingRequests.delete(msg.id);
+                    }
                 }
             } catch (e) {
                 console.error(`[AI Bridge] Failed to parse JSON: ${line}`, e);
@@ -83,21 +84,23 @@ startPythonBridge();
 async function getToxicityScores(text) {
     if (!pythonReady || !pythonProcess) return null;
     
+    const id = uuidv4();
+
     return new Promise((resolve, reject) => {
         // Store resolver
-        pendingRequests.set('latest', resolve);
+        pendingRequests.set(id, resolve);
         
         // Send request
-        const payload = JSON.stringify({ text }) + '\n';
+        const payload = JSON.stringify({ id, text }) + '\n';
         pythonProcess.stdin.write(payload);
         
         // Timeout
         setTimeout(() => {
-            if (pendingRequests.has('latest')) {
-                pendingRequests.delete('latest');
+            if (pendingRequests.has(id)) {
+                pendingRequests.delete(id);
                 resolve(null); // Timeout
             }
-        }, 3000);
+        }, 5000);
     });
 }
 

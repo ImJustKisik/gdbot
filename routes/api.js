@@ -337,4 +337,82 @@ router.get('/stats/activity', requireAuth, (req, res) => {
     }
 });
 
+// --- Moderation API ---
+router.post('/warn', requireAuth, async (req, res) => {
+    const { userId, reason, points } = req.body;
+    if (!userId || !reason || !points) return res.status(400).json({ error: 'Missing fields' });
+
+    try {
+        const guild = await getGuild();
+        const member = await fetchGuildMemberSafe(guild, userId);
+        
+        if (!member) return res.status(404).json({ error: 'User not found in guild' });
+
+        db.addWarning(userId, {
+            reason,
+            points: parseInt(points),
+            moderator: req.session.user?.username || 'Dashboard Admin',
+            date: new Date().toISOString()
+        });
+
+        const user = db.getUser(userId);
+        
+        // Auto-mute check
+        const autoMuteThreshold = getAppSetting('autoMuteThreshold') || DEFAULT_SETTINGS.autoMuteThreshold;
+        if (user.points >= autoMuteThreshold && member.moderatable) {
+             const duration = getAppSetting('autoMuteDuration') || DEFAULT_SETTINGS.autoMuteDuration;
+             await member.timeout(duration * 60 * 1000, 'Auto-mute: Exceeded points threshold');
+             await logAction(guild, 'Auto-Mute', `User <@${userId}> muted for ${duration}m (Points: ${user.points})`, 'Red');
+        }
+
+        await logAction(guild, 'Warn (Dashboard)', `User <@${userId}> warned by Dashboard. Reason: ${reason}`, 'Orange');
+
+        // Send DM
+        try {
+            await member.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle('You have been warned')
+                        .setColor('Orange')
+                        .addFields(
+                            { name: 'Reason', value: reason },
+                            { name: 'Points Added', value: points.toString() },
+                            { name: 'Total Points', value: user.points.toString() }
+                        )
+                ]
+            });
+        } catch (err) {
+            console.log(`Failed to send DM to ${userId}: ${err.message}`);
+        }
+
+        res.json({ success: true, user });
+    } catch (error) {
+        console.error('Warn error:', error);
+        res.status(500).json({ error: 'Failed to warn user' });
+    }
+});
+
+router.post('/clear', requireAuth, async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    try {
+        const guild = await getGuild();
+        const member = await fetchGuildMemberSafe(guild, userId);
+
+        db.clearPunishments(userId);
+        
+        if (member && member.moderatable) {
+            await member.timeout(null, 'Points cleared via Dashboard');
+        }
+
+        await logAction(guild, 'Clear (Dashboard)', `User <@${userId}> points cleared by Dashboard`, 'Green');
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Clear error:', error);
+        res.status(500).json({ error: 'Failed to clear user' });
+    }
+});
+
 module.exports = router;

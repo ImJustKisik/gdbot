@@ -47,9 +47,10 @@ def main():
                 
             data = json.loads(line)
             text = data.get('text', '')
+            req_id = data.get('id')
             
             if not text:
-                print(json.dumps({"error": "No text provided"}))
+                print(json.dumps({"error": "No text provided", "id": req_id}))
                 sys.stdout.flush()
                 continue
 
@@ -59,7 +60,7 @@ def main():
             # Convert numpy floats to python floats
             sanitized = {k: float(v) for k, v in results.items()}
             
-            print(json.dumps({"status": "ok", "results": sanitized}))
+            print(json.dumps({"status": "ok", "results": sanitized, "id": req_id}))
             sys.stdout.flush()
             
         except json.JSONDecodeError:
