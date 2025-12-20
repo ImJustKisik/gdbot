@@ -31,8 +31,8 @@ if (!SESSION_SECRET) {
 module.exports = {
     PORT,
     GUILD_ID: process.env.GUILD_ID,
-    GENAI_API_KEYS: apiKeys, // Legacy Gemini Keys
-    GROQ_API_KEY: process.env.GROQ_API_KEY, // New Groq Key
+    GENAI_API_KEYS: apiKeys, // Export array of keys
+    IMAGE_API_KEY: process.env.IMAGE_API_KEY, // Separate key for image analysis
     CLIENT_ID: process.env.CLIENT_ID,
     CLIENT_SECRET: process.env.CLIENT_SECRET,
     REDIRECT_URI: process.env.REDIRECT_URI || `http://localhost:${PORT}/api/auth/callback`,

@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { GENAI_API_KEYS } = require('./config');
+const { GENAI_API_KEYS, IMAGE_API_KEY } = require('./config');
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -7,6 +7,10 @@ const path = require('path');
 const apiKeys = GENAI_API_KEYS || [];
 if (apiKeys.length === 0) {
     console.error('DEBUG: API_KEY or API_KEYS is MISSING in process.env. Please check your .env file.');
+}
+
+if (!IMAGE_API_KEY) {
+    console.warn('DEBUG: IMAGE_API_KEY is MISSING in process.env. Image analysis might fail or use default keys if implemented fallback.');
 }
 
 // Round-robin counter
@@ -146,6 +150,10 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
             if (localScores) {
                 userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
             }
+            
+            // Use dedicated IMAGE_API_KEY if available, otherwise fallback to standard rotation
+            const token = IMAGE_API_KEY || apiKey;
+            
             const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
                 model: imageModel,
                 messages: [
@@ -154,7 +162,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
                 ]
             }, {
                 headers: {
-                    "Authorization": `Bearer ${apiKey}`,
+                    "Authorization": `Bearer ${token}`,
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://discord.com",
                     "X-Title": "Discord Guardian Bot"
