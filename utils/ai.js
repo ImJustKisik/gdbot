@@ -1,25 +1,22 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 const { GENAI_API_KEYS } = require('./config');
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Initialize models for all keys
-const models = [];
-if (GENAI_API_KEYS && GENAI_API_KEYS.length > 0) {
-    GENAI_API_KEYS.forEach((key, index) => {
-        try {
-            const genAI = new GoogleGenerativeAI(key);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-            models.push({
-                instance: model,
-                keyMask: `...${key.slice(-4)}`,
-                usage: 0,
-                id: index + 1
-            });
-        } catch (e) {
-            console.error(`Failed to initialize AI model with key ending in ...${key.slice(-4)}:`, e.message);
-        }
-    });
+// Initialize keys
+const apiKeys = GENAI_API_KEYS || [];
+if (apiKeys.length === 0) {
+    console.error('DEBUG: API_KEY or API_KEYS is MISSING in process.env. Please check your .env file.');
+}
+
+// Round-robin counter
+let currentKeyIndex = 0;
+
+function getNextKey() {
+    if (apiKeys.length === 0) return null;
+    const key = apiKeys[currentKeyIndex];
+    currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+    return key;
 }
 
 // --- Python Detoxify Bridge ---
@@ -100,27 +97,15 @@ async function getToxicityScores(text) {
     });
 }
 
-// Round-robin counter
-let currentKeyIndex = 0;
-
-function getNextModel() {
-    if (models.length === 0) return null;
-    const wrapper = models[currentKeyIndex];
-    wrapper.usage++;
-    currentKeyIndex = (currentKeyIndex + 1) % models.length;
-    return wrapper;
-}
-
 async function analyzeContent(text, imageBuffer = null, mimeType = null) {
-    const wrapper = getNextModel();
-    if (!wrapper) {
-        console.error("AI Error: No models initialized. Check API_KEYS.");
+    const apiKey = getNextKey();
+    if (!apiKey) {
+        console.error("AI Error: No API keys available.");
         return null;
     }
 
     // Log usage stats
-    console.log(`[AI LB] Key ${wrapper.id} (${wrapper.keyMask}) | Usage: ${wrapper.usage}`);
-    const model = wrapper.instance;
+    console.log(`[AI LB] Using key ...${apiKey.slice(-4)}`);
 
     // Run local toxicity check (Python Detoxify)
     let localScores = "";
@@ -143,13 +128,13 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
                     console.log(`[Detoxify] Scores for "${text.substring(0, 20)}...": ${localScores}`);
                 }
 
-                // SKIP GEMINI if toxicity is low (< 70%) and no image
+                // SKIP AI if toxicity is low (< 70%) and no image
                 if (!imageBuffer && maxScore < 0.7) {
-                    console.log(`[AI] Skipping Gemini: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
+                    console.log(`[AI] Skipping OpenRouter: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
                     return null;
                 }
             } else {
-                console.log("[Detoxify] No response or timeout. Proceeding to Gemini.");
+                console.log("[Detoxify] No response or timeout. Proceeding to OpenRouter.");
             }
         }
     } catch (e) {
@@ -182,7 +167,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
 4.1. ПОЛИТИКА: Запрещены любые обсуждения текущих политических событий и провокации на эту тему.
 `;
 
-        const promptText = `
+        const systemPrompt = `
 Ты — Lusty Xeno, ИИ-страж игрового Discord сервера. Твоя задача — защищать чат от реальной грязи, политики и сливов игры, но не душнить за локальные мемы.
 
 ГЛАВНЫЕ ПРИОРИТЕТЫ (УРОВНИ УГРОЗЫ):
@@ -223,11 +208,6 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null) {
 ПРАВИЛА СЕРВЕРА:
 ${rules}
 
-КОНТЕНТ ДЛЯ АНАЛИЗА:
-Текст: "${text || '[Нет текста]'}"
-${imageBuffer ? '[Приложено изображение]' : ''}
-${localScores ? `\n[ВАЖНО] Локальный анализ токсичности (Detoxify): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.` : ''}
-
 Ответь ТОЛЬКО JSON объектом:
 { 
     "violation": boolean, 
@@ -235,25 +215,52 @@ ${localScores ? `\n[ВАЖНО] Локальный анализ токсично
     "severity": number (0-100),
     "comment": "string (Комментарий в стиле Lusty Xeno: строгий, но справедливый. Заполнять ТОЛЬКО если violation=true)" 
 }`;
-        
-        const parts = [promptText];
+
+        const userContent = [
+            { type: "text", text: `Текст: "${text || '[Нет текста]'}"` }
+        ];
+
         if (imageBuffer && mimeType) {
-            parts.push({
-                inlineData: {
-                    data: imageBuffer.toString('base64'),
-                    mimeType: mimeType
+            userContent.push({
+                type: "image_url",
+                image_url: {
+                    url: `data:${mimeType};base64,${imageBuffer.toString('base64')}`
                 }
             });
         }
+        
+        if (localScores) {
+            userContent.push({
+                type: "text",
+                text: `\n[ВАЖНО] Локальный анализ токсичности (Detoxify): ${localScores}\nИспользуй эти данные как подсказку, но принимай решение на основе контекста.`
+            });
+        }
 
-        const result = await model.generateContent(parts);
-        const response = await result.response;
-        const textResponse = response.text().replace(/```json|```/g, '').trim();
-        return JSON.parse(textResponse);
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+            model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userContent }
+            ]
+        }, {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://discord.com", // Optional
+                "X-Title": "Discord Guardian Bot" // Optional
+            }
+        });
+
+        const content = response.data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : content;
+        
+        return JSON.parse(jsonStr);
+
     } catch (error) {
-        console.error("AI Error:", error);
+        console.error("AI Error:", error.response?.data || error.message);
         // Simple retry logic: if one key fails, try the next one immediately
-        if (models.length > 1) {
+        if (apiKeys.length > 1) {
             console.log("Retrying with next API key...");
             return analyzeContent(text, imageBuffer, mimeType); 
         }
@@ -261,6 +268,4 @@ ${localScores ? `\n[ВАЖНО] Локальный анализ токсично
     }
 }
 
-module.exports = {
-    analyzeContent
-};
+module.exports = { analyzeContent };
