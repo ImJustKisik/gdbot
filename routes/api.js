@@ -372,7 +372,7 @@ router.get('/stats/invites', requireAuth, async (req, res) => {
 
 // --- Moderation API ---
 router.post('/warn', requireAuth, async (req, res) => {
-    const { userId, reason, points } = req.body;
+    const { userId, reason, points, anonymous } = req.body;
     if (!userId || !reason || !points) return res.status(400).json({ error: 'Missing fields' });
 
     try {
@@ -381,7 +381,7 @@ router.post('/warn', requireAuth, async (req, res) => {
         
         if (!member) return res.status(404).json({ error: 'User not found in guild' });
 
-        const moderatorName = req.session.user?.username || 'Dashboard Admin';
+        const moderatorName = anonymous ? 'Dashboard' : (req.session.user?.username || 'Dashboard Admin');
 
         db.addWarning(userId, {
             reason,
@@ -428,7 +428,7 @@ router.post('/warn', requireAuth, async (req, res) => {
 });
 
 router.post('/clear', requireAuth, async (req, res) => {
-    const { userId } = req.body;
+    const { userId, anonymous } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
     try {
@@ -441,7 +441,7 @@ router.post('/clear', requireAuth, async (req, res) => {
             await member.timeout(null, 'Points cleared via Dashboard');
         }
 
-        const moderatorName = req.session.user?.username || 'Dashboard Admin';
+        const moderatorName = anonymous ? 'Dashboard' : (req.session.user?.username || 'Dashboard Admin');
         await logAction(guild, 'Clear (Dashboard)', `User <@${userId}> points cleared by ${moderatorName}`, 'Green');
 
         res.json({ success: true });

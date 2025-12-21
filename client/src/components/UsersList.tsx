@@ -44,6 +44,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<{ type: ActionType; userId?: string } | null>(null);
   const [maxPoints, setMaxPoints] = useState(20);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [clearUser, setClearUser] = useState<User | null>(null);
 
   useEffect(() => {
     settingsApi.getBundle().then(data => {
@@ -147,10 +149,11 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     setActionState('warn', selectedUser.id);
     try {
       const warnTarget = selectedUser.username;
-      await usersApi.warn(selectedUser.id, warnPoints, warnReason);
+      await usersApi.warn(selectedUser.id, warnPoints, warnReason, isAnonymous);
       setSelectedUser(null);
       setWarnReason('');
       setWarnPoints(1);
+      setIsAnonymous(false);
       await refresh();
       triggerFeedback('success', `Предупреждение отправлено: ${warnTarget}`);
     } catch (err) {
@@ -160,11 +163,17 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     }
   };
 
-  const handleClear = async (userId: string) => {
-    if (!confirm('Сбросить все наказания для этого пользователя?')) return;
-    setActionState('clear', userId);
+  const handleClear = (user: User) => {
+    setClearUser(user);
+    setIsAnonymous(false);
+  };
+
+  const confirmClear = async () => {
+    if (!clearUser) return;
+    setActionState('clear', clearUser.id);
     try {
-      await usersApi.clear(userId);
+      await usersApi.clear(clearUser.id, isAnonymous);
+      setClearUser(null);
       await refresh();
       triggerFeedback('success', 'Наказания очищены');
     } catch (err) {
@@ -551,7 +560,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                       <AlertTriangle size={18} />
                     </button>
                     <button 
-                      onClick={() => handleClear(user.id)}
+                      onClick={() => handleClear(user)}
                       disabled={isActionLoading('clear', user.id)}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Clear Punishments"
@@ -628,7 +637,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
               />
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
               <input 
                 type="number" 
@@ -638,6 +647,19 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 min="1"
                 max="20"
               />
+            </div>
+
+            <div className="mb-6 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="warnAnonymous"
+                checked={isAnonymous}
+                onChange={(e) => setIsAnonymous(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <label htmlFor="warnAnonymous" className="text-sm text-gray-700">
+                Скрыть мой никнейм в логах
+              </label>
             </div>
 
             <div className="flex justify-end gap-3">
@@ -766,6 +788,55 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                     ))}
                 </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Clear Modal */}
+      {clearUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setClearUser(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold">Сброс наказаний</h3>
+                <p className="text-sm text-gray-500">Для {clearUser.username}</p>
+              </div>
+              <button onClick={() => setClearUser(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-gray-700 mb-6">
+              Вы уверены, что хотите сбросить все очки нарушений и снять тайм-аут для этого пользователя?
+            </p>
+
+            <div className="mb-6 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="clearAnonymous"
+                checked={isAnonymous}
+                onChange={(e) => setIsAnonymous(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+              <label htmlFor="clearAnonymous" className="text-sm text-gray-700">
+                Скрыть мой никнейм в логах
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setClearUser(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Отмена
+              </button>
+              <button 
+                onClick={confirmClear}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Сбросить
+              </button>
+            </div>
           </div>
         </div>
       )}

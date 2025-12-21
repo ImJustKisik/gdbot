@@ -31,11 +31,11 @@ export const usersApi = {
   getUserGuilds: (userId: string) => 
     api.get<Guild[]>(`/user/${userId}/guilds`).then((res) => res.data),
     
-  warn: (userId: string, points: number, reason: string) => 
-    api.post('/warn', { userId, points, reason }),
+  warn: (userId: string, points: number, reason: string, anonymous: boolean = false) => 
+    api.post('/warn', { userId, points, reason, anonymous }),
     
-  clear: (userId: string) => 
-    api.post('/clear', { userId }),
+  clear: (userId: string, anonymous: boolean = false) => 
+    api.post('/clear', { userId, anonymous }),
     
   sendVerification: (userId: string) => 
     api.post('/verify/send-dm', { userId }),
