@@ -6,6 +6,8 @@ const { checkAppealValidity, createAppealSummary } = require('../../utils/ai');
 const { GUILD_ID } = require('../../utils/config');
 
 async function handleInteraction(interaction) {
+    console.log(`[Interaction Debug] Received interaction: ${interaction.customId || interaction.commandName} (Type: ${interaction.type})`);
+
     // Handle Buttons
     if (interaction.isButton()) {
         if (interaction.customId === 'verify_retry') {
