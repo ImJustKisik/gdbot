@@ -518,6 +518,16 @@ module.exports = {
         return db.prepare('SELECT alias FROM invite_aliases WHERE code = ?').get(code);
     },
 
+    getInviteJoins: (code) => {
+        return db.prepare(`
+            SELECT u.id, u.points, ui.joined_at
+            FROM user_invites ui
+            JOIN users_v2 u ON u.id = ui.user_id
+            WHERE ui.code = ?
+            ORDER BY ui.joined_at DESC
+        `).all(code);
+    },
+
     getAllInviteAliases: () => {
         const rows = db.prepare('SELECT code, alias FROM invite_aliases').all();
         const aliases = {};

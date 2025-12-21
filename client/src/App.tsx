@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2 } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -213,6 +213,16 @@ function App() {
             <List size={20} />
             Audit Logs
           </Link>
+          <Link 
+            to="/invites"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              location.pathname === '/invites' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Share2 size={20} />
+            Invites
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100">
@@ -248,7 +258,6 @@ function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                 <div className="lg:col-span-2 space-y-8">
                   <DashboardStats users={users} />
-                  <InvitesStats />
                 </div>
                 <div className="lg:col-span-1">
                   <RecentActivity />
@@ -266,6 +275,15 @@ function App() {
             </>
           } />
           <Route path="/verification" element={<VerificationView />} />
+          <Route path="/invites" element={
+            <>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-800">Invite Tracking</h2>
+                <p className="text-gray-500">Monitor server invites and join statistics</p>
+              </div>
+              <InvitesStats />
+            </>
+          } />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/logs" element={<LogsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />

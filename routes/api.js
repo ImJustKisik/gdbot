@@ -496,4 +496,60 @@ router.post('/invites/:code/alias', requireAuth, async (req, res) => {
     }
 });
 
+// Get Invite Joins
+router.get('/invites/:code/joins', requireAuth, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const joins = db.getInviteJoins(code);
+        const guild = await getGuild();
+        
+        const enrichedJoins = await Promise.all(joins.map(async (join) => {
+            const member = await fetchGuildMemberSafe(guild, join.id);
+            return {
+                id: join.id,
+                username: member ? member.user.username : 'Unknown User',
+                avatar: member ? member.user.displayAvatarURL() : null,
+                joinedAt: join.joined_at,
+                points: join.points
+            };
+        }));
+        
+        res.json(enrichedJoins);
+    } catch (error) {
+        console.error('Error fetching invite joins:', error);
+        res.status(500).json({ error: 'Failed to fetch invite joins' });
+    }
+});
+
+// Get Invite Stats
+router.get('/stats/invites', requireAuth, async (req, res) => {
+    try {
+        const stats = db.getInvitesStats();
+        
+        // Enrich with usernames if possible
+        const guild = await getGuild();
+        if (guild) {
+            for (const inviter of stats.topInviters) {
+                try {
+                    const member = await fetchGuildMemberSafe(guild, inviter.inviter_id);
+                    if (member) {
+                        inviter.username = member.user.username;
+                        inviter.avatar = member.user.displayAvatarURL();
+                    } else {
+                        inviter.username = 'Unknown User';
+                    }
+                } catch (e) {
+                    inviter.username = 'Unknown User';
+                }
+            }
+        }
+        
+        res.json(stats);
+    } catch (error) {
+        console.error('Error fetching invite stats:', error);
+        res.status(500).json({ error: 'Failed to fetch invite stats' });
+    }
+});
+
+
 module.exports = router;
