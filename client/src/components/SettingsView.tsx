@@ -248,87 +248,72 @@ export const SettingsView: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Log Channel</label>
-                            <input 
-                                type="text" 
-                                list="log-channel-options"
+                            <select 
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 value={settings.logChannelId || ''}
                                 onChange={e => setSettings({...settings, logChannelId: e.target.value})}
-                                placeholder="Search or enter ID..."
-                            />
-                            <datalist id="log-channel-options">
+                            >
+                                <option value="">Не выбрано</option>
                                 {channels.map(channel => (
-                                    <option key={channel.value} value={channel.value} label={`#${channel.label}`} />
+                                    <option key={channel.value} value={channel.value}>#{channel.label}</option>
                                 ))}
-                            </datalist>
+                            </select>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Mod Log Channel</label>
-                            <input 
-                                type="text" 
-                                list="mod-log-channel-options"
+                            <select 
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 value={settings.modLogChannelId || ''}
                                 onChange={e => setSettings({...settings, modLogChannelId: e.target.value})}
-                                placeholder="Search or enter ID..."
-                            />
-                            <datalist id="mod-log-channel-options">
+                            >
+                                <option value="">Не выбрано</option>
                                 {channels.map(channel => (
-                                    <option key={`${channel.value}-mod`} value={channel.value} label={`#${channel.label}`} />
+                                    <option key={`${channel.value}-mod`} value={channel.value}>#{channel.label}</option>
                                 ))}
-                            </datalist>
+                            </select>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.modLogChannelId)}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel</label>
-                            <input 
-                                type="text" 
-                                list="verification-channel-options"
+                            <select 
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 value={settings.verificationChannelId || ''}
                                 onChange={e => setSettings({...settings, verificationChannelId: e.target.value})}
-                                placeholder="Search or enter ID..."
-                            />
-                            <datalist id="verification-channel-options">
+                            >
+                                <option value="">Не выбрано</option>
                                 {channels.map(channel => (
-                                    <option key={`${channel.value}-verify`} value={channel.value} label={`#${channel.label}`} />
+                                    <option key={`${channel.value}-verify`} value={channel.value}>#{channel.label}</option>
                                 ))}
-                            </datalist>
+                            </select>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.verificationChannelId)}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Unverified Role</label>
-                            <input 
-                                type="text" 
-                                list="role-unverified-options"
+                            <select 
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 value={settings.roleUnverified || ''}
                                 onChange={e => setSettings({...settings, roleUnverified: e.target.value})}
-                                placeholder="Search or enter ID..."
-                            />
-                            <datalist id="role-unverified-options">
+                            >
+                                <option value="">Не выбрано</option>
                                 {roles.map(role => (
-                                    <option key={`${role.value}-unverified`} value={role.value} label={role.label} />
+                                    <option key={`${role.value}-unverified`} value={role.value}>{role.label}</option>
                                 ))}
-                            </datalist>
+                            </select>
                             <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleUnverified)}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Verified Role</label>
-                            <input 
-                                type="text" 
-                                list="role-verified-options"
+                            <select 
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 value={settings.roleVerified || ''}
                                 onChange={e => setSettings({...settings, roleVerified: e.target.value})}
-                                placeholder="Search or enter ID..."
-                            />
-                            <datalist id="role-verified-options">
+                            >
+                                <option value="">Не выбрано</option>
                                 {roles.map(role => (
-                                    <option key={`${role.value}-verified`} value={role.value} label={role.label} />
+                                    <option key={`${role.value}-verified`} value={role.value}>{role.label}</option>
                                 ))}
-                            </datalist>
+                            </select>
                             <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleVerified)}</p>
                         </div>
                     </div>
