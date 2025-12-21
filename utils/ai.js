@@ -359,13 +359,15 @@ async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-li
     }
 }
 
-async function checkAppealValidity(text) {
-    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`);
+async function checkAppealValidity(text, options = {}) {
+    const { prompt = APPEAL_FILTER_PROMPT } = options;
+    return await askAI(prompt, `Текст апелляции: "${text}"`);
 }
 
-async function createAppealSummary(appealText, punishmentContext) {
-    const prompt = APPEAL_SUMMARY_PROMPT.replace('{{CONTEXT}}', punishmentContext);
-    return await askAI(prompt, `Текст апелляции: "${appealText}"`);
+async function createAppealSummary(appealText, punishmentContext, options = {}) {
+    const { prompt = APPEAL_SUMMARY_PROMPT } = options;
+    const finalPrompt = prompt.replace('{{CONTEXT}}', punishmentContext);
+    return await askAI(finalPrompt, `Текст апелляции: "${appealText}"`);
 }
 
-module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary };
+module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary, APPEAL_FILTER_PROMPT, APPEAL_SUMMARY_PROMPT };

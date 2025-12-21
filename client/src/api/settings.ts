@@ -15,6 +15,8 @@ export interface Settings {
   aiRules?: string;
   appealsEnabled?: boolean;
   appealsChannelId?: string;
+  appealsPromptFilter?: string;
+  appealsPromptSummary?: string;
 }
 
 export interface Escalation {

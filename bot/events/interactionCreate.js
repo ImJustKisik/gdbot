@@ -1,9 +1,9 @@
 const { PermissionsBitField, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
-const { sendVerificationDM } = require('../../utils/helpers');
+const { sendVerificationDM, getAppSetting } = require('../../utils/helpers');
 const Sentry = require('@sentry/node');
 const db = require('../../db');
 const { checkAppealValidity, createAppealSummary } = require('../../utils/ai');
-const { GUILD_ID, getAppSetting } = require('../../utils/config');
+const { GUILD_ID } = require('../../utils/config');
 
 async function handleInteraction(interaction) {
     // Handle Buttons
