@@ -1,5 +1,5 @@
 const { PermissionsBitField, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
-const { sendVerificationDM, getAppSetting } = require('../../utils/helpers');
+const { sendVerificationDM, getAppSetting, logAction } = require('../../utils/helpers');
 const Sentry = require('@sentry/node');
 const db = require('../../db');
 const { checkAppealValidity, createAppealSummary } = require('../../utils/ai');
