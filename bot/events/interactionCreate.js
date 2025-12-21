@@ -165,22 +165,27 @@ async function handleInteraction(interaction) {
 
         // Handle Appeal Review (Create Ticket)
         if (interaction.customId.startsWith('appeal_review:')) {
+            console.log(`[Appeal Debug] Starting review for ${interaction.customId}`);
             try {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                console.log('[Appeal Debug] Deferred reply');
                 
                 const [_, userId, punishmentId] = interaction.customId.split(':');
                 const guild = interaction.guild;
                 
                 // Check permissions
                 if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+                    console.log('[Appeal Debug] Permission denied');
                     await interaction.editReply({ content: 'У вас нет прав для этого действия.' });
                     return;
                 }
 
                 const ticketsCategoryId = getAppSetting('ticketsCategoryId');
+                console.log(`[Appeal Debug] Category ID: ${ticketsCategoryId}`);
                 const category = ticketsCategoryId ? guild.channels.cache.get(ticketsCategoryId) : null;
 
                 if (!category && ticketsCategoryId) {
+                    console.log('[Appeal Debug] Category not found in cache');
                     await interaction.editReply({ content: 'Категория тикетов не найдена. Проверьте настройки.' });
                     return;
                 }
@@ -188,10 +193,12 @@ async function handleInteraction(interaction) {
                 const channelName = `appeal-${userId}`;
                 const existingChannel = guild.channels.cache.find(c => c.name === channelName);
                 if (existingChannel) {
+                    console.log(`[Appeal Debug] Channel exists: ${existingChannel.id}`);
                     await interaction.editReply({ content: `Канал рассмотрения уже существует: ${existingChannel}` });
                     return;
                 }
 
+                console.log('[Appeal Debug] Creating channel...');
                 const channel = await guild.channels.create({
                     name: channelName,
                     type: ChannelType.GuildText,
@@ -211,9 +218,11 @@ async function handleInteraction(interaction) {
                         }
                     ]
                 });
+                console.log(`[Appeal Debug] Channel created: ${channel.id}`);
 
                 // Fetch appeal details
                 const appeal = db.getAppealByPunishmentId(punishmentId);
+                console.log(`[Appeal Debug] Appeal fetched: ${appeal ? appeal.id : 'null'}`);
                 
                 const embed = new EmbedBuilder()
                     .setTitle('Рассмотрение апелляции')
@@ -237,6 +246,7 @@ async function handleInteraction(interaction) {
                             .setStyle(ButtonStyle.Danger)
                     );
 
+                console.log('[Appeal Debug] Sending message to ticket channel...');
                 await channel.send({ content: `<@${userId}> <@${interaction.user.id}>`, embeds: [embed], components: [row] });
                 
                 // Update appeal status
@@ -245,9 +255,11 @@ async function handleInteraction(interaction) {
                 }
 
                 // Log to dashboard
+                console.log('[Appeal Debug] Logging action...');
                 await logAction(guild, 'Appeal Review Started', `Moderator ${interaction.user.tag} started reviewing appeal for <@${userId}>`, 'Yellow');
 
                 await interaction.editReply({ content: `Канал создан: ${channel}` });
+                console.log('[Appeal Debug] Done.');
             } catch (error) {
                 console.error('Error in appeal_review:', error);
                 // Try to reply if not already replied
