@@ -9,7 +9,11 @@ const SNOWFLAKE_REGEX = /^\d{5,}$/;
 
 function getAppSetting(key) {
     const val = db.getSetting(key);
-    return val !== null ? val : DEFAULT_SETTINGS[key];
+    const value = val !== null ? val : DEFAULT_SETTINGS[key];
+    if (key === 'aiEnabled' || key === 'appealsEnabled') {
+        return value === 'true' || value === true;
+    }
+    return value;
 }
 
 function isSnowflake(value) {

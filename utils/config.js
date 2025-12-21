@@ -48,6 +48,8 @@ module.exports = {
         autoMuteThreshold: 20,
         autoMuteDuration: 60, // minutes
         roleUnverified: "Unverified",
-        roleVerified: "Verified"
+        roleVerified: "Verified",
+        appealsEnabled: true,
+        appealsChannelId: ""
     }
 };

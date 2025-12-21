@@ -13,6 +13,8 @@ export interface Settings {
   aiAction?: string;
   aiPrompt?: string;
   aiRules?: string;
+  appealsEnabled?: boolean;
+  appealsChannelId?: string;
 }
 
 export interface Escalation {
@@ -24,8 +26,8 @@ export interface Escalation {
 }
 
 export interface SelectOption {
-  id: string;
-  name: string;
+  value: string;
+  label: string;
 }
 
 export interface Preset {

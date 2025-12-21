@@ -14,7 +14,9 @@ const INITIAL_SETTINGS: Settings = {
     aiThreshold: 60,
     aiAction: 'log',
     aiPrompt: '',
-    aiRules: ''
+    aiRules: '',
+    appealsEnabled: true,
+    appealsChannelId: ''
 };
 
 export const SettingsView: React.FC = () => {
@@ -57,7 +59,9 @@ export const SettingsView: React.FC = () => {
                 aiThreshold: Number(bundleSettings.aiThreshold ?? 60),
                 aiAction: bundleSettings.aiAction || 'log',
                 aiPrompt: bundleSettings.aiPrompt || '',
-                aiRules: bundleSettings.aiRules || ''
+                aiRules: bundleSettings.aiRules || '',
+                appealsEnabled: bundleSettings.appealsEnabled !== undefined ? bundleSettings.appealsEnabled : true,
+                appealsChannelId: bundleSettings.appealsChannelId || ''
             });
             setPresets(Array.isArray(data.presets) ? data.presets : []);
             setEscalations(Array.isArray(data.escalations) ? data.escalations : []);
@@ -79,7 +83,8 @@ export const SettingsView: React.FC = () => {
                 ...settings,
                 autoMuteThreshold: Number(settings.autoMuteThreshold) || 0,
                 autoMuteDuration: Math.max(1, Number(settings.autoMuteDuration) || INITIAL_SETTINGS.autoMuteDuration),
-                aiThreshold: Number(settings.aiThreshold) || 60
+                aiThreshold: Number(settings.aiThreshold) || 60,
+                appealsEnabled: Boolean(settings.appealsEnabled)
             };
             await settingsApi.updateSettings(payload);
             setFeedback({ type: 'success', message: 'Настройки сохранены.' });
@@ -554,46 +559,63 @@ export const SettingsView: React.FC = () => {
                     <h2 className="text-xl font-bold mb-6 text-gray-800">AI Moderation Configuration</h2>
                     
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
                             <div>
-                                <h3 className="font-medium text-gray-900">Enable AI Monitoring</h3>
-                                <p className="text-sm text-gray-500">Analyze messages for toxicity and violations.</p>
+                                <label className="text-white font-medium">Включить AI анализ</label>
+                                <p className="text-sm text-gray-400">Автоматически проверять сообщения на токсичность</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input 
                                     type="checkbox" 
                                     className="sr-only peer"
                                     checked={settings.aiEnabled}
-                                    onChange={e => setSettings({...settings, aiEnabled: e.target.checked})}
+                                    onChange={(e) => setSettings({...settings, aiEnabled: e.target.checked})}
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Sensitivity Threshold (0-100)</label>
+                                <label className="text-white font-medium">Включить систему апелляций</label>
+                                <p className="text-sm text-gray-400">Разрешить пользователям подавать апелляции через AI</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
                                 <input 
-                                    type="number" 
-                                    min="0"
-                                    max="100"
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={settings.aiThreshold}
-                                    onChange={e => setSettings({...settings, aiThreshold: Number(e.target.value)})}
+                                    type="checkbox" 
+                                    className="sr-only peer"
+                                    checked={settings.appealsEnabled}
+                                    onChange={(e) => setSettings({...settings, appealsEnabled: e.target.checked})}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Higher value = less sensitive (fewer false positives).</p>
+                                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Канал для апелляций</label>
+                                <select 
+                                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                    value={settings.appealsChannelId}
+                                    onChange={(e) => setSettings({...settings, appealsChannelId: e.target.value})}
+                                >
+                                    <option value="">Выберите канал...</option>
+                                    {channels.map(c => (
+                                        <option key={c.value} value={c.value}>{c.label}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-400 mt-1">Сюда будут приходить заявки на разбан/размут</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Action on Violation</label>
-                                <select 
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={settings.aiAction}
-                                    onChange={e => setSettings({...settings, aiAction: e.target.value})}
-                                >
-                                    <option value="log">Log Only (Reply)</option>
-                                    <option value="delete">Delete Message</option>
-                                    {/* Future: Mute, Warn */}
-                                </select>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Порог срабатывания (%)</label>
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    max="100"
+                                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                                    value={settings.aiThreshold}
+                                    onChange={(e) => setSettings({...settings, aiThreshold: parseInt(e.target.value)})}
+                                />
                             </div>
                         </div>
 

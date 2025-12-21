@@ -3,7 +3,7 @@ const { sendVerificationDM } = require('../../utils/helpers');
 const Sentry = require('@sentry/node');
 const db = require('../../db');
 const { checkAppealValidity, createAppealSummary } = require('../../utils/ai');
-const { GUILD_ID } = require('../../utils/config');
+const { GUILD_ID, getAppSetting } = require('../../utils/config');
 
 async function handleInteraction(interaction) {
     // Handle Buttons
@@ -34,6 +34,12 @@ async function handleInteraction(interaction) {
         }
 
         if (interaction.customId.startsWith('appeal_start:')) {
+            const appealsEnabled = getAppSetting('appealsEnabled') !== 'false'; // Default true
+            if (!appealsEnabled) {
+                await interaction.reply({ content: '❌ Система апелляций временно отключена администрацией.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+
             const [_, type, id] = interaction.customId.split(':');
             
             const modal = new ModalBuilder()
@@ -109,7 +115,11 @@ async function handleInteraction(interaction) {
             // 5. Notify Moderators
             const guild = interaction.client.guilds.cache.get(GUILD_ID);
             if (guild) {
-                const appealsChannel = guild.channels.cache.find(c => c.name === 'appeals');
+                const appealsChannelId = getAppSetting('appealsChannelId');
+                const appealsChannel = appealsChannelId 
+                    ? guild.channels.cache.get(appealsChannelId) 
+                    : guild.channels.cache.find(c => c.name === 'appeals');
+
                 if (appealsChannel) {
                     const embed = new EmbedBuilder()
                         .setTitle('⚖️ Новая апелляция')
