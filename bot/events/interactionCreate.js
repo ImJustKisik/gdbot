@@ -165,83 +165,102 @@ async function handleInteraction(interaction) {
 
         // Handle Appeal Review (Create Ticket)
         if (interaction.customId.startsWith('appeal_review:')) {
-            const [_, userId, punishmentId] = interaction.customId.split(':');
-            const guild = interaction.guild;
-            
-            // Check permissions
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-                return interaction.reply({ content: 'У вас нет прав для этого действия.', flags: MessageFlags.Ephemeral });
-            }
+            try {
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                
+                const [_, userId, punishmentId] = interaction.customId.split(':');
+                const guild = interaction.guild;
+                
+                // Check permissions
+                if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+                    await interaction.editReply({ content: 'У вас нет прав для этого действия.' });
+                    return;
+                }
 
-            const ticketsCategoryId = getAppSetting('ticketsCategoryId');
-            const category = ticketsCategoryId ? guild.channels.cache.get(ticketsCategoryId) : null;
+                const ticketsCategoryId = getAppSetting('ticketsCategoryId');
+                const category = ticketsCategoryId ? guild.channels.cache.get(ticketsCategoryId) : null;
 
-            if (!category && ticketsCategoryId) {
-                 return interaction.reply({ content: 'Категория тикетов не найдена. Проверьте настройки.', flags: MessageFlags.Ephemeral });
-            }
+                if (!category && ticketsCategoryId) {
+                    await interaction.editReply({ content: 'Категория тикетов не найдена. Проверьте настройки.' });
+                    return;
+                }
 
-            const channelName = `appeal-${userId}`;
-            const existingChannel = guild.channels.cache.find(c => c.name === channelName);
-            if (existingChannel) {
-                return interaction.reply({ content: `Канал рассмотрения уже существует: ${existingChannel}`, flags: MessageFlags.Ephemeral });
-            }
+                const channelName = `appeal-${userId}`;
+                const existingChannel = guild.channels.cache.find(c => c.name === channelName);
+                if (existingChannel) {
+                    await interaction.editReply({ content: `Канал рассмотрения уже существует: ${existingChannel}` });
+                    return;
+                }
 
-            const channel = await guild.channels.create({
-                name: channelName,
-                type: ChannelType.GuildText,
-                parent: category ? category.id : null,
-                permissionOverwrites: [
-                    {
-                        id: guild.id,
-                        deny: [PermissionFlagsBits.ViewChannel],
-                    },
-                    {
-                        id: userId,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-                    },
-                    {
-                        id: interaction.user.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                const channel = await guild.channels.create({
+                    name: channelName,
+                    type: ChannelType.GuildText,
+                    parent: category ? category.id : null,
+                    permissionOverwrites: [
+                        {
+                            id: guild.id,
+                            deny: [PermissionFlagsBits.ViewChannel],
+                        },
+                        {
+                            id: userId,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        },
+                        {
+                            id: interaction.user.id,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        }
+                    ]
+                });
+
+                // Fetch appeal details
+                const appeal = db.getAppealByPunishmentId(punishmentId);
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('Рассмотрение апелляции')
+                    .setDescription(`Апелляция от <@${userId}>`)
+                    .addFields(
+                        { name: 'Причина наказания', value: appeal ? appeal.reason : 'N/A' },
+                        { name: 'Текст апелляции', value: appeal ? appeal.appeal_text : 'N/A' },
+                        { name: 'AI Summary', value: appeal ? appeal.ai_summary : 'N/A' }
+                    )
+                    .setColor('Yellow');
+
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`appeal_decision:approve:${userId}:${punishmentId}`)
+                            .setLabel('Снять наказание')
+                            .setStyle(ButtonStyle.Success),
+                        new ButtonBuilder()
+                            .setCustomId(`appeal_decision:deny:${userId}:${punishmentId}`)
+                            .setLabel('Оставить в силе')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                await channel.send({ content: `<@${userId}> <@${interaction.user.id}>`, embeds: [embed], components: [row] });
+                
+                // Update appeal status
+                if (appeal) {
+                    db.updateAppealStatus(appeal.id, 'reviewing');
+                }
+
+                // Log to dashboard
+                await logAction(guild, 'Appeal Review Started', `Moderator ${interaction.user.tag} started reviewing appeal for <@${userId}>`, 'Yellow');
+
+                await interaction.editReply({ content: `Канал создан: ${channel}` });
+            } catch (error) {
+                console.error('Error in appeal_review:', error);
+                // Try to reply if not already replied
+                try {
+                    if (!interaction.deferred && !interaction.replied) {
+                        await interaction.reply({ content: 'Произошла ошибка при создании тикета.', flags: MessageFlags.Ephemeral });
+                    } else {
+                        await interaction.editReply({ content: 'Произошла ошибка при создании тикета.' });
                     }
-                ]
-            });
-
-            // Fetch appeal details
-            const appeal = db.getAppealByPunishmentId(punishmentId);
-            
-            const embed = new EmbedBuilder()
-                .setTitle('Рассмотрение апелляции')
-                .setDescription(`Апелляция от <@${userId}>`)
-                .addFields(
-                    { name: 'Причина наказания', value: appeal ? appeal.reason : 'N/A' },
-                    { name: 'Текст апелляции', value: appeal ? appeal.appeal_text : 'N/A' },
-                    { name: 'AI Summary', value: appeal ? appeal.ai_summary : 'N/A' }
-                )
-                .setColor('Yellow');
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`appeal_decision:approve:${userId}:${punishmentId}`)
-                        .setLabel('Снять наказание')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId(`appeal_decision:deny:${userId}:${punishmentId}`)
-                        .setLabel('Оставить в силе')
-                        .setStyle(ButtonStyle.Danger)
-                );
-
-            await channel.send({ content: `<@${userId}> <@${interaction.user.id}>`, embeds: [embed], components: [row] });
-            
-            // Update appeal status
-            if (appeal) {
-                db.updateAppealStatus(appeal.id, 'reviewing');
+                } catch (e) {
+                    // Ignore
+                }
             }
-
-            // Log to dashboard
-            await logAction(guild, 'Appeal Review Started', `Moderator ${interaction.user.tag} started reviewing appeal for <@${userId}>`, 'Yellow');
-
-            await interaction.reply({ content: `Канал создан: ${channel}`, flags: MessageFlags.Ephemeral });
             return;
         }
 
