@@ -1,16 +1,6 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
-const session = require('express-session');
-const SQLiteStore = require('./session-store');
 const { PORT, SESSION_SECRET, REDIRECT_URI, SENTRY_DSN } = require('./utils/config');
-const { startBot, client } = require('./bot'); // Imports from bot/index.js
-const authRoutes = require('./routes/auth');
-const apiRoutes = require('./routes/api');
-
-const app = express();
 
 Sentry.init({
   dsn: SENTRY_DSN,
@@ -22,6 +12,17 @@ Sentry.init({
   // Set sampling rate for profiling - this is relative to tracesSampleRate
   profilesSampleRate: 1.0,
 });
+
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const session = require('express-session');
+const SQLiteStore = require('./session-store');
+const { startBot, client } = require('./bot'); // Imports from bot/index.js
+const authRoutes = require('./routes/auth');
+const apiRoutes = require('./routes/api');
+
+const app = express();
 
 // --- Middleware ---
 // The request handler must be the first middleware on the app
