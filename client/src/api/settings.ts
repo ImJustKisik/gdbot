@@ -8,6 +8,11 @@ export interface Settings {
   roleVerified: string;
   autoMuteThreshold: number;
   autoMuteDuration: number;
+  aiEnabled?: boolean;
+  aiThreshold?: number;
+  aiAction?: string;
+  aiPrompt?: string;
+  aiRules?: string;
 }
 
 export interface Escalation {

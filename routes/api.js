@@ -203,6 +203,13 @@ router.post('/settings', requireAuth, async (req, res) => {
         if (autoMuteThreshold !== undefined) normalized.autoMuteThreshold = autoMuteThreshold;
         if (autoMuteDuration !== undefined) normalized.autoMuteDuration = autoMuteDuration;
 
+        // AI Settings
+        if (payload.aiEnabled !== undefined) normalized.aiEnabled = payload.aiEnabled;
+        if (payload.aiThreshold !== undefined) normalized.aiThreshold = parseNumberSetting(payload.aiThreshold, 'AI Threshold', { min: 0, max: 100 });
+        if (payload.aiAction !== undefined) normalized.aiAction = payload.aiAction;
+        if (payload.aiPrompt !== undefined) normalized.aiPrompt = payload.aiPrompt;
+        if (payload.aiRules !== undefined) normalized.aiRules = payload.aiRules;
+
         for (const [key, value] of Object.entries(normalized)) {
             db.setSetting(key, value);
         }

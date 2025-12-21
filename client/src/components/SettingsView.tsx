@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, AlertTriangle, Settings as SettingsIcon, Shield, List } from 'lucide-react';
+import { Save, Plus, Trash2, AlertTriangle, Settings as SettingsIcon, Shield, List, Brain } from 'lucide-react';
 import { settingsApi, Settings, Preset, Escalation, SelectOption } from '../api/settings';
 
 const INITIAL_SETTINGS: Settings = {
@@ -9,7 +9,12 @@ const INITIAL_SETTINGS: Settings = {
     roleUnverified: '',
     roleVerified: '',
     autoMuteThreshold: 20,
-    autoMuteDuration: 60
+    autoMuteDuration: 60,
+    aiEnabled: true,
+    aiThreshold: 60,
+    aiAction: 'log',
+    aiPrompt: '',
+    aiRules: ''
 };
 
 export const SettingsView: React.FC = () => {
@@ -19,7 +24,7 @@ export const SettingsView: React.FC = () => {
     const [channels, setChannels] = useState<SelectOption[]>([]);
     const [roles, setRoles] = useState<SelectOption[]>([]);
     
-    const [activeTab, setActiveTab] = useState<'general' | 'automod' | 'presets'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'automod' | 'presets' | 'ai'>('general');
 
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetPoints, setNewPresetPoints] = useState(1);
@@ -47,7 +52,12 @@ export const SettingsView: React.FC = () => {
                 ...INITIAL_SETTINGS,
                 ...bundleSettings,
                 autoMuteThreshold: Number(bundleSettings.autoMuteThreshold ?? INITIAL_SETTINGS.autoMuteThreshold),
-                autoMuteDuration: Number(bundleSettings.autoMuteDuration ?? INITIAL_SETTINGS.autoMuteDuration)
+                autoMuteDuration: Number(bundleSettings.autoMuteDuration ?? INITIAL_SETTINGS.autoMuteDuration),
+                aiEnabled: bundleSettings.aiEnabled !== undefined ? bundleSettings.aiEnabled : true,
+                aiThreshold: Number(bundleSettings.aiThreshold ?? 60),
+                aiAction: bundleSettings.aiAction || 'log',
+                aiPrompt: bundleSettings.aiPrompt || '',
+                aiRules: bundleSettings.aiRules || ''
             });
             setPresets(Array.isArray(data.presets) ? data.presets : []);
             setEscalations(Array.isArray(data.escalations) ? data.escalations : []);
@@ -68,7 +78,8 @@ export const SettingsView: React.FC = () => {
             const payload = {
                 ...settings,
                 autoMuteThreshold: Number(settings.autoMuteThreshold) || 0,
-                autoMuteDuration: Math.max(1, Number(settings.autoMuteDuration) || INITIAL_SETTINGS.autoMuteDuration)
+                autoMuteDuration: Math.max(1, Number(settings.autoMuteDuration) || INITIAL_SETTINGS.autoMuteDuration),
+                aiThreshold: Number(settings.aiThreshold) || 60
             };
             await settingsApi.updateSettings(payload);
             setFeedback({ type: 'success', message: 'Настройки сохранены.' });
@@ -211,6 +222,17 @@ export const SettingsView: React.FC = () => {
                 >
                     <List size={18} />
                     Presets
+                </button>
+                <button
+                    onClick={() => setActiveTab('ai')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'ai' 
+                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <Brain size={18} />
+                    AI Moderation
                 </button>
             </div>
             
@@ -520,6 +542,91 @@ export const SettingsView: React.FC = () => {
                             >
                                 <Plus size={16} />
                                 Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Settings */}
+            {activeTab === 'ai' && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800">AI Moderation Configuration</h2>
+                    
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div>
+                                <h3 className="font-medium text-gray-900">Enable AI Monitoring</h3>
+                                <p className="text-sm text-gray-500">Analyze messages for toxicity and violations.</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer"
+                                    checked={settings.aiEnabled}
+                                    onChange={e => setSettings({...settings, aiEnabled: e.target.checked})}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Sensitivity Threshold (0-100)</label>
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    max="100"
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={settings.aiThreshold}
+                                    onChange={e => setSettings({...settings, aiThreshold: Number(e.target.value)})}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Higher value = less sensitive (fewer false positives).</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Action on Violation</label>
+                                <select 
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={settings.aiAction}
+                                    onChange={e => setSettings({...settings, aiAction: e.target.value})}
+                                >
+                                    <option value="log">Log Only (Reply)</option>
+                                    <option value="delete">Delete Message</option>
+                                    {/* Future: Mute, Warn */}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                            <p className="text-xs text-gray-500 mb-2">The core instructions for the AI. Use <code>{'{{RULES}}'}</code> to insert the rules below.</p>
+                            <textarea 
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-64"
+                                value={settings.aiPrompt}
+                                onChange={e => setSettings({...settings, aiPrompt: e.target.value})}
+                                placeholder="Enter system prompt..."
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Server Rules</label>
+                            <p className="text-xs text-gray-500 mb-2">These rules will be injected into the prompt.</p>
+                            <textarea 
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                value={settings.aiRules}
+                                onChange={e => setSettings({...settings, aiRules: e.target.value})}
+                                placeholder="Enter server rules..."
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-4 border-t border-gray-100">
+                            <button 
+                                onClick={handleSaveSettings}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium shadow-sm"
+                            >
+                                <Save size={18} />
+                                {saving ? 'Saving...' : 'Save AI Settings'}
                             </button>
                         </div>
                     </div>
