@@ -423,6 +423,10 @@ module.exports = {
         return db.prepare('SELECT * FROM appeals WHERE id = ?').get(id);
     },
 
+    getAppealByPunishmentId: (punishmentId) => {
+        return db.prepare('SELECT * FROM appeals WHERE punishment_id = ?').get(punishmentId);
+    },
+
     updateAppealStatus: (id, status) => {
         return db.prepare('UPDATE appeals SET status = ? WHERE id = ?').run(status, id);
     },

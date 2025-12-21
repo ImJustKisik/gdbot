@@ -1,5 +1,5 @@
 const express = require('express');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ChannelType } = require('discord.js');
 const db = require('../db');
 const { 
     getGuild, 
@@ -220,6 +220,11 @@ router.post('/settings', requireAuth, async (req, res) => {
         if (payload.aiPrompt !== undefined) normalized.aiPrompt = payload.aiPrompt;
         if (payload.aiRules !== undefined) normalized.aiRules = payload.aiRules;
 
+        // Appeals Settings
+        if (payload.appealsEnabled !== undefined) normalized.appealsEnabled = payload.appealsEnabled;
+        if (payload.appealsChannelId !== undefined) normalized.appealsChannelId = payload.appealsChannelId;
+        if (payload.ticketsCategoryId !== undefined) normalized.ticketsCategoryId = payload.ticketsCategoryId;
+
         for (const [key, value] of Object.entries(normalized)) {
             db.setSetting(key, value);
         }
@@ -250,8 +255,11 @@ router.get('/channels', requireAuth, async (req, res) => {
     try {
         const guild = await getGuild();
         const channels = guild.channels.cache
-            .filter(channel => isTextBasedGuildChannel(channel))
-            .map(channel => ({ value: channel.id, label: channel.name || `#${channel.id}` }))
+            .filter(channel => isTextBasedGuildChannel(channel) || channel.type === ChannelType.GuildCategory)
+            .map(channel => {
+                const prefix = channel.type === ChannelType.GuildCategory ? '[Category] ' : '#';
+                return { value: channel.id, label: `${prefix}${channel.name}` };
+            })
             .sort((a, b) => a.label.localeCompare(b.label));
         res.json(channels);
     } catch (error) {

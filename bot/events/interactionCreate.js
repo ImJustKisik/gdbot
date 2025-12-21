@@ -1,4 +1,4 @@
-const { PermissionsBitField, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
+const { PermissionsBitField, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { sendVerificationDM, getAppSetting } = require('../../utils/helpers');
 const Sentry = require('@sentry/node');
 const db = require('../../db');
@@ -41,6 +41,13 @@ async function handleInteraction(interaction) {
             }
 
             const [_, type, id] = interaction.customId.split(':');
+            
+            // Check if appeal already exists
+            const existingAppeal = db.getAppealByPunishmentId(id);
+            if (existingAppeal) {
+                await interaction.reply({ content: '❌ Вы уже подали апелляцию на это наказание.', flags: MessageFlags.Ephemeral });
+                return;
+            }
             
             const modal = new ModalBuilder()
                 .setCustomId(`appeal_modal:${type}:${id}`)
@@ -134,13 +141,199 @@ async function handleInteraction(interaction) {
                         )
                         .setTimestamp();
 
-                    await appealsChannel.send({ embeds: [embed] });
+                    const row = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(`appeal_review:${interaction.user.id}:${id}`)
+                                .setLabel('Рассмотреть')
+                                .setStyle(ButtonStyle.Primary),
+                            new ButtonBuilder()
+                                .setCustomId(`appeal_reject_dm:${interaction.user.id}:${id}`)
+                                .setLabel('Отклонить')
+                                .setStyle(ButtonStyle.Danger)
+                        );
+
+                    await appealsChannel.send({ embeds: [embed], components: [row] });
                 } else {
                     console.error('Channel #appeals not found!');
                 }
             }
 
             await interaction.editReply({ content: '✅ Ваша апелляция отправлена модераторам.' });
+            return;
+        }
+
+        // Handle Appeal Review (Create Ticket)
+        if (interaction.customId.startsWith('appeal_review:')) {
+            const [_, userId, punishmentId] = interaction.customId.split(':');
+            const guild = interaction.guild;
+            
+            // Check permissions
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+                return interaction.reply({ content: 'У вас нет прав для этого действия.', flags: MessageFlags.Ephemeral });
+            }
+
+            const ticketsCategoryId = getAppSetting('ticketsCategoryId');
+            const category = ticketsCategoryId ? guild.channels.cache.get(ticketsCategoryId) : null;
+
+            if (!category && ticketsCategoryId) {
+                 return interaction.reply({ content: 'Категория тикетов не найдена. Проверьте настройки.', flags: MessageFlags.Ephemeral });
+            }
+
+            const channelName = `appeal-${userId}`;
+            const existingChannel = guild.channels.cache.find(c => c.name === channelName);
+            if (existingChannel) {
+                return interaction.reply({ content: `Канал рассмотрения уже существует: ${existingChannel}`, flags: MessageFlags.Ephemeral });
+            }
+
+            const channel = await guild.channels.create({
+                name: channelName,
+                type: ChannelType.GuildText,
+                parent: category ? category.id : null,
+                permissionOverwrites: [
+                    {
+                        id: guild.id,
+                        deny: [PermissionFlagsBits.ViewChannel],
+                    },
+                    {
+                        id: userId,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    }
+                ]
+            });
+
+            // Fetch appeal details
+            const appeal = db.getAppealByPunishmentId(punishmentId);
+            
+            const embed = new EmbedBuilder()
+                .setTitle('Рассмотрение апелляции')
+                .setDescription(`Апелляция от <@${userId}>`)
+                .addFields(
+                    { name: 'Причина наказания', value: appeal ? appeal.reason : 'N/A' },
+                    { name: 'Текст апелляции', value: appeal ? appeal.appeal_text : 'N/A' },
+                    { name: 'AI Summary', value: appeal ? appeal.ai_summary : 'N/A' }
+                )
+                .setColor('Yellow');
+
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`appeal_decision:approve:${userId}:${punishmentId}`)
+                        .setLabel('Снять наказание')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId(`appeal_decision:deny:${userId}:${punishmentId}`)
+                        .setLabel('Оставить в силе')
+                        .setStyle(ButtonStyle.Danger)
+                );
+
+            await channel.send({ content: `<@${userId}> <@${interaction.user.id}>`, embeds: [embed], components: [row] });
+            
+            // Update appeal status
+            if (appeal) {
+                db.updateAppealStatus(appeal.id, 'reviewing');
+            }
+
+            // Log to dashboard
+            await logAction(guild, 'Appeal Review Started', `Moderator ${interaction.user.tag} started reviewing appeal for <@${userId}>`, 'Yellow');
+
+            await interaction.reply({ content: `Канал создан: ${channel}`, flags: MessageFlags.Ephemeral });
+            return;
+        }
+
+        // Handle Appeal Decision
+        if (interaction.customId.startsWith('appeal_decision:')) {
+            const [_, decision, userId, punishmentId] = interaction.customId.split(':');
+            
+             // Check permissions
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+                return interaction.reply({ content: 'У вас нет прав для этого действия.', flags: MessageFlags.Ephemeral });
+            }
+
+            const appeal = db.getAppealByPunishmentId(punishmentId);
+            const guild = interaction.guild;
+
+            if (decision === 'approve') {
+                // Remove punishment
+                if (appeal && appeal.type === 'warn') {
+                    // We need to find the warning and remove points? 
+                    // Or just clear all punishments? The prompt says "Снять наказание".
+                    // Let's assume we remove the specific warning if possible, but our DB structure makes it hard to remove just one warning's points without recalculating.
+                    // For now, let's just clear the warning from DB and subtract points.
+                    
+                    const warning = db.getWarning(punishmentId);
+                    if (warning) {
+                        // Manually remove warning and update points
+                        db.db.prepare('DELETE FROM warnings WHERE id = ?').run(punishmentId);
+                        db.db.prepare('UPDATE users_v2 SET points = points - ? WHERE id = ?').run(warning.points, userId);
+                        
+                        await interaction.channel.send('✅ Предупреждение удалено, баллы сняты.');
+                    } else {
+                        await interaction.channel.send('⚠️ Предупреждение не найдено в БД (возможно уже удалено).');
+                    }
+                } else if (appeal && appeal.type === 'mute') {
+                    const member = await guild.members.fetch(userId).catch(() => null);
+                    if (member) {
+                        await member.timeout(null, 'Appeal Approved');
+                        await interaction.channel.send('✅ Мут снят.');
+                    }
+                }
+
+                if (appeal) db.updateAppealStatus(appeal.id, 'approved');
+                await logAction(guild, 'Appeal Approved', `Appeal for <@${userId}> approved by ${interaction.user.tag}`, 'Green');
+
+            } else {
+                if (appeal) db.updateAppealStatus(appeal.id, 'rejected');
+                await logAction(guild, 'Appeal Rejected', `Appeal for <@${userId}> rejected by ${interaction.user.tag}`, 'Red');
+                await interaction.channel.send('❌ Наказание оставлено в силе.');
+            }
+
+            // Disable buttons
+            const disabledRow = ActionRowBuilder.from(interaction.message.components[0]);
+            disabledRow.components.forEach(c => c.setDisabled(true));
+            await interaction.message.edit({ components: [disabledRow] });
+
+            await interaction.reply({ content: 'Решение принято.', flags: MessageFlags.Ephemeral });
+            
+            // Close channel after delay
+            setTimeout(() => {
+                interaction.channel.delete().catch(() => {});
+            }, 10000);
+            return;
+        }
+
+        // Handle Quick Reject (DM)
+        if (interaction.customId.startsWith('appeal_reject_dm:')) {
+             const [_, userId, punishmentId] = interaction.customId.split(':');
+             
+             // Check permissions
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+                return interaction.reply({ content: 'У вас нет прав для этого действия.', flags: MessageFlags.Ephemeral });
+            }
+
+            const appeal = db.getAppealByPunishmentId(punishmentId);
+            if (appeal) db.updateAppealStatus(appeal.id, 'rejected');
+
+            const guild = interaction.guild;
+            const member = await guild.members.fetch(userId).catch(() => null);
+            if (member) {
+                try {
+                    await member.send('Ваша апелляция была отклонена модераторами.');
+                } catch (e) {}
+            }
+
+            await logAction(guild, 'Appeal Rejected', `Appeal for <@${userId}> rejected by ${interaction.user.tag} (Quick Action)`, 'Red');
+            
+            await interaction.reply({ content: 'Апелляция отклонена.', flags: MessageFlags.Ephemeral });
+            
+            // Disable buttons on the original message
+            const disabledRow = ActionRowBuilder.from(interaction.message.components[0]);
+            disabledRow.components.forEach(c => c.setDisabled(true));
+            await interaction.message.edit({ components: [disabledRow] });
             return;
         }
     }

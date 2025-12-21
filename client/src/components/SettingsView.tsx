@@ -16,7 +16,8 @@ const INITIAL_SETTINGS: Settings = {
     aiPrompt: '',
     aiRules: '',
     appealsEnabled: true,
-    appealsChannelId: ''
+    appealsChannelId: '',
+    ticketsCategoryId: ''
 };
 
 export const SettingsView: React.FC = () => {
@@ -61,7 +62,8 @@ export const SettingsView: React.FC = () => {
                 aiPrompt: bundleSettings.aiPrompt || '',
                 aiRules: bundleSettings.aiRules || '',
                 appealsEnabled: bundleSettings.appealsEnabled !== undefined ? bundleSettings.appealsEnabled : true,
-                appealsChannelId: bundleSettings.appealsChannelId || ''
+                appealsChannelId: bundleSettings.appealsChannelId || '',
+                ticketsCategoryId: bundleSettings.ticketsCategoryId || ''
             });
             setPresets(Array.isArray(data.presets) ? data.presets : []);
             setEscalations(Array.isArray(data.escalations) ? data.escalations : []);
@@ -589,18 +591,21 @@ export const SettingsView: React.FC = () => {
                                         <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-400 mt-1">Сюда будут приходить заявки на разбан/размут</p>
+                                <p className="text-xs text-gray-400 mt-1">Куда бот будет отправлять новые апелляции</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Порог срабатывания (%)</label>
-                                <input 
-                                    type="number" 
-                                    min="1" 
-                                    max="100"
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Категория тикетов</label>
+                                <select
+                                    value={settings.ticketsCategoryId}
+                                    onChange={(e) => setSettings({ ...settings, ticketsCategoryId: e.target.value })}
                                     className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                                    value={settings.aiThreshold}
-                                    onChange={(e) => setSettings({...settings, aiThreshold: parseInt(e.target.value)})}
-                                />
+                                >
+                                    <option value="">Выберите категорию...</option>
+                                    {channels.filter(c => c.label.startsWith('[Category]')).map(c => (
+                                        <option key={c.value} value={c.value}>{c.label.replace('[Category] ', '')}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-400 mt-1">Где создавать каналы для рассмотрения</p>
                             </div>
                         </div>
 
