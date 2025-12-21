@@ -157,8 +157,11 @@ router.get('/settings/bundle', requireAuth, async (req, res) => {
             .sort((a, b) => a.label.localeCompare(b.label));
             
         const channels = guild.channels.cache
-            .filter(channel => isTextBasedGuildChannel(channel))
-            .map(channel => ({ value: channel.id, label: channel.name || `#${channel.id}` }))
+            .filter(channel => isTextBasedGuildChannel(channel) || channel.type === ChannelType.GuildCategory)
+            .map(channel => {
+                const prefix = channel.type === ChannelType.GuildCategory ? '[Category] ' : '#';
+                return { value: channel.id, label: `${prefix}${channel.name}` };
+            })
             .sort((a, b) => a.label.localeCompare(b.label));
 
         res.json({
