@@ -26,7 +26,7 @@ export const usersApi = {
   getAll: () => api.get<PaginatedResponse<User>>('/users?limit=1000').then((res) => res.data.data),
   
   getWarnings: (userId: string) => 
-    api.get<{ warnings: Warning[] }>(`/users/${userId}/warnings`).then((res) => res.data),
+    api.get<{ warnings: Warning[], invite?: User['invite'] }>(`/users/${userId}/warnings`).then((res) => res.data),
     
   getUserGuilds: (userId: string) => 
     api.get<Guild[]>(`/user/${userId}/guilds`).then((res) => res.data),

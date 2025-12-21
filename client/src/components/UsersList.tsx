@@ -31,6 +31,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
 
   const [historyUser, setHistoryUser] = useState<User | null>(null);
   const [historyWarnings, setHistoryWarnings] = useState<Warning[] | null>(null);
+  const [historyInvite, setHistoryInvite] = useState<User['invite'] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -216,11 +217,13 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const openHistoryModal = async (user: User) => {
     setHistoryUser(user);
     setHistoryWarnings(null);
+    setHistoryInvite(null);
     setHistoryError(null);
     setHistoryLoading(true);
     try {
       const data = await usersApi.getWarnings(user.id);
       setHistoryWarnings(data.warnings || []);
+      setHistoryInvite(data.invite || null);
     } catch (err) {
       console.error(err);
       setHistoryWarnings([]);
@@ -233,6 +236,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const closeHistoryModal = () => {
     setHistoryUser(null);
     setHistoryWarnings(null);
+    setHistoryInvite(null);
     setHistoryError(null);
   };
 
@@ -659,32 +663,63 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={closeHistoryModal}>
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl shadow-xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold">Warning History: {historyUser.username}</h3>
+              <h3 className="text-xl font-bold">User Details: {historyUser.username}</h3>
               <button onClick={closeHistoryModal} className="text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
 
             {historyLoading ? (
-              <p className="text-gray-500 text-center py-8">Loading warnings...</p>
+              <p className="text-gray-500 text-center py-8">Loading details...</p>
             ) : historyError ? (
               <p className="text-red-500 text-center py-8">{historyError}</p>
-            ) : historyWarnings && historyWarnings.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No warnings recorded for this user.</p>
             ) : (
-              <div className="space-y-4">
-                {(historyWarnings || []).map((warning, idx) => (
-                  <div key={idx} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-semibold text-gray-900">{warning.reason}</span>
-                      <span className="text-xs text-gray-500">{new Date(warning.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Points: <span className="font-medium text-orange-600">+{warning.points}</span></span>
-                      <span className="text-gray-500">By: {warning.moderator || 'System'}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-6">
+                {/* Invite Info */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <h4 className="text-sm font-bold text-blue-800 uppercase mb-2">Invite Information</h4>
+                    {historyInvite ? (
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span className="text-gray-500 block">Invited By (ID)</span>
+                                <span className="font-mono text-gray-800">{historyInvite.inviterId || 'Unknown'}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block">Invite Code</span>
+                                <span className="font-mono text-blue-600">{historyInvite.code}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block">Joined At</span>
+                                <span className="text-gray-800">{new Date(historyInvite.joinedAt).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 text-sm">No invite information available for this user.</p>
+                    )}
+                </div>
+
+                {/* Warnings */}
+                <div>
+                    <h4 className="text-sm font-bold text-gray-800 uppercase mb-3">Warning History</h4>
+                    {historyWarnings && historyWarnings.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4 bg-gray-50 rounded-lg">No warnings recorded for this user.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {(historyWarnings || []).map((warning, idx) => (
+                            <div key={idx} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                                <div className="flex justify-between items-start mb-2">
+                                <span className="font-semibold text-gray-900">{warning.reason}</span>
+                                <span className="text-xs text-gray-500">{new Date(warning.date).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Points: <span className="font-medium text-orange-600">+{warning.points}</span></span>
+                                <span className="text-gray-500">By: {warning.moderator || 'System'}</span>
+                                </div>
+                            </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
               </div>
             )}
           </div>

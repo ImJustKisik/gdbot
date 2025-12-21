@@ -118,7 +118,10 @@ router.get('/users', requireAuth, async (req, res) => {
 router.get('/users/:id/warnings', requireAuth, (req, res) => {
     try {
         const user = db.getUser(req.params.id);
-        res.json({ warnings: user.warnings || [] });
+        res.json({ 
+            warnings: user.warnings || [],
+            invite: user.invite || null
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch user warnings' });
@@ -442,6 +445,54 @@ router.post('/clear', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Clear error:', error);
         res.status(500).json({ error: 'Failed to clear user' });
+    }
+});
+
+// Get All Active Invites with Aliases
+router.get('/invites', requireAuth, async (req, res) => {
+    try {
+        const guild = await getGuild();
+        if (!guild) return res.status(500).json({ error: 'Guild not found' });
+
+        const invites = await guild.invites.fetch();
+        const aliases = db.getAllInviteAliases();
+
+        const result = [];
+        for (const invite of invites.values()) {
+            result.push({
+                code: invite.code,
+                uses: invite.uses,
+                inviter: invite.inviter ? {
+                    id: invite.inviter.id,
+                    username: invite.inviter.username,
+                    avatar: invite.inviter.displayAvatarURL()
+                } : null,
+                alias: aliases[invite.code] || null,
+                url: invite.url
+            });
+        }
+
+        // Sort by uses desc
+        result.sort((a, b) => b.uses - a.uses);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching invites:', error);
+        res.status(500).json({ error: 'Failed to fetch invites' });
+    }
+});
+
+// Set Invite Alias
+router.post('/invites/:code/alias', requireAuth, async (req, res) => {
+    const { code } = req.params;
+    const { alias } = req.body;
+
+    try {
+        db.setInviteAlias(code, alias);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error setting invite alias:', error);
+        res.status(500).json({ error: 'Failed to set alias' });
     }
 });
 

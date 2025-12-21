@@ -9,6 +9,7 @@ import { SettingsView } from './components/SettingsView';
 import { LogsView } from './components/LogsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import InvitesStats from './components/InvitesStats';
+import { RecentActivity } from './components/RecentActivity';
 import { User } from './types';
 import { authApi } from './api/auth';
 import { usersApi } from './api/users';
@@ -244,10 +245,14 @@ function App() {
                 </div>
               </div>
               
-              <DashboardStats users={users} />
-              
-              <div className="mb-8">
-                <InvitesStats />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div className="lg:col-span-2 space-y-8">
+                  <DashboardStats users={users} />
+                  <InvitesStats />
+                </div>
+                <div className="lg:col-span-1">
+                  <RecentActivity />
+                </div>
               </div>
               
               <ErrorBoundary>

@@ -53,6 +53,12 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users_v2(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS invite_aliases (
+    code TEXT PRIMARY KEY,
+    alias TEXT,
+    created_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS escalations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
@@ -236,6 +242,7 @@ module.exports = {
         const user = db.prepare('SELECT points, is_monitored FROM users_v2 WHERE id = ?').get(userId);
         const warnings = db.prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY date DESC').all(userId);
         const oauth = db.prepare('SELECT * FROM user_oauth WHERE user_id = ?').get(userId);
+        const invite = db.prepare('SELECT * FROM user_invites WHERE user_id = ?').get(userId);
 
         return {
             id: userId,
@@ -247,6 +254,12 @@ module.exports = {
                 refreshToken: oauth.refresh_token,
                 guilds: JSON.parse(oauth.guilds || '[]'),
                 verifiedAt: oauth.verified_at
+            } : null,
+            invite: invite ? {
+                inviterId: invite.inviter_id,
+                code: invite.code,
+                uses: invite.uses,
+                joinedAt: invite.joined_at
             } : null
         };
     },
@@ -491,6 +504,27 @@ module.exports = {
         `).all();
         
         return { totalInvites, topInviters };
+    },
+
+    // --- Invite Aliases ---
+    setInviteAlias: (code, alias) => {
+        return db.prepare(`
+            INSERT OR REPLACE INTO invite_aliases (code, alias, created_at)
+            VALUES (?, ?, datetime('now'))
+        `).run(code, alias);
+    },
+
+    getInviteAlias: (code) => {
+        return db.prepare('SELECT alias FROM invite_aliases WHERE code = ?').get(code);
+    },
+
+    getAllInviteAliases: () => {
+        const rows = db.prepare('SELECT code, alias FROM invite_aliases').all();
+        const aliases = {};
+        for (const row of rows) {
+            aliases[row.code] = row.alias;
+        }
+        return aliases;
     },
 
     // Deprecated but kept for safety if I missed something

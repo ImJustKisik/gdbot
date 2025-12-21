@@ -13,4 +13,10 @@ export interface User {
   warningsCount: number;
   warnings?: Warning[];
   status: 'Verified' | 'Muted' | 'Unverified';
+  invite?: {
+    inviterId: string;
+    code: string;
+    uses: number;
+    joinedAt: string;
+  };
 }
