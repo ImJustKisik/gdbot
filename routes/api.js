@@ -153,13 +153,13 @@ router.get('/settings/bundle', requireAuth, async (req, res) => {
         
         const roles = guild.roles.cache
             .filter(r => r.name !== '@everyone')
-            .map(r => ({ id: r.id, name: r.name }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .map(r => ({ value: r.id, label: r.name }))
+            .sort((a, b) => a.label.localeCompare(b.label));
             
         const channels = guild.channels.cache
             .filter(channel => isTextBasedGuildChannel(channel))
-            .map(channel => ({ id: channel.id, name: channel.name || `#${channel.id}` }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .map(channel => ({ value: channel.id, label: channel.name || `#${channel.id}` }))
+            .sort((a, b) => a.label.localeCompare(b.label));
 
         res.json({
             settings: mergedSettings,
@@ -237,8 +237,8 @@ router.get('/roles', requireAuth, async (req, res) => {
         const guild = await getGuild();
         const roles = guild.roles.cache
             .filter(r => r.name !== '@everyone')
-            .map(r => ({ id: r.id, name: r.name }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .map(r => ({ value: r.id, label: r.name }))
+            .sort((a, b) => a.label.localeCompare(b.label));
         res.json(roles);
     } catch (error) {
         console.error(error);
@@ -251,8 +251,8 @@ router.get('/channels', requireAuth, async (req, res) => {
         const guild = await getGuild();
         const channels = guild.channels.cache
             .filter(channel => isTextBasedGuildChannel(channel))
-            .map(channel => ({ id: channel.id, name: channel.name || `#${channel.id}` }))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .map(channel => ({ value: channel.id, label: channel.name || `#${channel.id}` }))
+            .sort((a, b) => a.label.localeCompare(b.label));
         res.json(channels);
     } catch (error) {
         console.error(error);
