@@ -59,7 +59,7 @@ module.exports = {
             reason,
             points,
             date: new Date().toISOString(),
-            moderator: interaction.user.tag,
+            moderator: interaction.member.displayName,
             evidence: evidence ? evidence.url : null
         };
         db.addWarning(targetUser.id, warning);
@@ -75,7 +75,7 @@ module.exports = {
         await logAction(
             interaction.guild, 
             'User Warned (Command)', 
-            `User <@${targetUser.id}> was warned by ${interaction.user.tag}`, 
+            `User <@${targetUser.id}> was warned by ${interaction.member.displayName}`, 
             'Orange', 
             logFields,
             evidence ? evidence.url : null

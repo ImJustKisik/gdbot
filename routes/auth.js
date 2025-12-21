@@ -111,7 +111,7 @@ router.get('/callback', async (req, res) => {
             // Create Session
             req.session.user = {
                 id: discordUser.id,
-                username: discordUser.username,
+                username: member.displayName || discordUser.username,
                 avatar: `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`,
                 isAdmin: true
             };

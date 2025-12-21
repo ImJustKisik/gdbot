@@ -381,10 +381,12 @@ router.post('/warn', requireAuth, async (req, res) => {
         
         if (!member) return res.status(404).json({ error: 'User not found in guild' });
 
+        const moderatorName = req.session.user?.username || 'Dashboard Admin';
+
         db.addWarning(userId, {
             reason,
             points: parseInt(points),
-            moderator: req.session.user?.username || 'Dashboard Admin',
+            moderator: moderatorName,
             date: new Date().toISOString()
         });
 
@@ -398,7 +400,7 @@ router.post('/warn', requireAuth, async (req, res) => {
              await logAction(guild, 'Auto-Mute', `User <@${userId}> muted for ${duration}m (Points: ${user.points})`, 'Red');
         }
 
-        await logAction(guild, 'Warn (Dashboard)', `User <@${userId}> warned by Dashboard. Reason: ${reason}`, 'Orange');
+        await logAction(guild, 'Warn (Dashboard)', `User <@${userId}> warned by ${moderatorName}. Reason: ${reason}`, 'Orange');
 
         // Send DM
         try {
@@ -439,7 +441,8 @@ router.post('/clear', requireAuth, async (req, res) => {
             await member.timeout(null, 'Points cleared via Dashboard');
         }
 
-        await logAction(guild, 'Clear (Dashboard)', `User <@${userId}> points cleared by Dashboard`, 'Green');
+        const moderatorName = req.session.user?.username || 'Dashboard Admin';
+        await logAction(guild, 'Clear (Dashboard)', `User <@${userId}> points cleared by ${moderatorName}`, 'Green');
 
         res.json({ success: true });
     } catch (error) {
