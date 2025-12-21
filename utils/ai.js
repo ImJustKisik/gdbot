@@ -217,7 +217,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
     try {
         if (imageBuffer && mimeType) {
             // Проверка изображения через Gemini (или LLaVA)
-            const imageModel = "google/gemini-2.0-flash-lite-preview-02-05:free"; // или другую подходящую
+            const imageModel = "google/gemini-2.0-flash-001"; // или другую подходящую
             const systemPrompt = "Ты — Lusty Xeno, ИИ-страж Discord. Проверь изображение на NSFW, экстремизм, политику, метагейминг. Ответь ТОЛЬКО JSON: { violation: boolean, reason: string, severity: number, comment: string }";
             const userContent = [
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBuffer.toString('base64')}` } }
@@ -331,7 +331,7 @@ const APPEAL_SUMMARY_PROMPT = `
 }
 `;
 
-async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-lite-preview-02-05:free") {
+async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-001") {
     const apiKey = getNextKey();
     if (!apiKey) return null;
 
@@ -359,15 +359,13 @@ async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-li
     }
 }
 
-async function checkAppealValidity(text, options = {}) {
-    const { prompt = APPEAL_FILTER_PROMPT } = options;
-    return await askAI(prompt, `Текст апелляции: "${text}"`);
+async function checkAppealValidity(text) {
+    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`);
 }
 
-async function createAppealSummary(appealText, punishmentContext, options = {}) {
-    const { prompt = APPEAL_SUMMARY_PROMPT } = options;
-    const finalPrompt = prompt.replace('{{CONTEXT}}', punishmentContext);
-    return await askAI(finalPrompt, `Текст апелляции: "${appealText}"`);
+async function createAppealSummary(appealText, punishmentContext) {
+    const prompt = APPEAL_SUMMARY_PROMPT.replace('{{CONTEXT}}', punishmentContext);
+    return await askAI(prompt, `Текст апелляции: "${appealText}"`);
 }
 
-module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary, APPEAL_FILTER_PROMPT, APPEAL_SUMMARY_PROMPT };
+module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary };
