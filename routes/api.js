@@ -337,6 +337,36 @@ router.get('/stats/activity', requireAuth, (req, res) => {
     }
 });
 
+// Get Invite Stats
+router.get('/stats/invites', requireAuth, async (req, res) => {
+    try {
+        const stats = db.getInvitesStats();
+        
+        // Enrich with usernames if possible
+        const guild = await getGuild();
+        if (guild) {
+            for (const inviter of stats.topInviters) {
+                try {
+                    const member = await fetchGuildMemberSafe(guild, inviter.inviter_id);
+                    if (member) {
+                        inviter.username = member.user.username;
+                        inviter.avatar = member.user.displayAvatarURL();
+                    } else {
+                        inviter.username = 'Unknown User';
+                    }
+                } catch (e) {
+                    inviter.username = 'Unknown User';
+                }
+            }
+        }
+        
+        res.json(stats);
+    } catch (error) {
+        console.error('Error fetching invite stats:', error);
+        res.status(500).json({ error: 'Failed to fetch invite stats' });
+    }
+});
+
 // --- Moderation API ---
 router.post('/warn', requireAuth, async (req, res) => {
     const { userId, reason, points } = req.body;

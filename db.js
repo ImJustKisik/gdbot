@@ -44,6 +44,15 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users_v2(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS user_invites (
+    user_id TEXT PRIMARY KEY,
+    inviter_id TEXT,
+    code TEXT,
+    uses INTEGER,
+    joined_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users_v2(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS escalations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
@@ -444,6 +453,44 @@ module.exports = {
             ...log,
             fields: JSON.parse(log.fields || '[]')
         }));
+    },
+
+    // --- Invites ---
+    saveUserInvite: (userId, inviterId, code, uses) => {
+        // Ensure user exists in users_v2
+        db.prepare('INSERT OR IGNORE INTO users_v2 (id) VALUES (?)').run(userId);
+        
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO user_invites (user_id, inviter_id, code, uses, joined_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        `);
+        stmt.run(userId, inviterId, code, uses);
+    },
+
+    getTopInviters: (limit = 10) => {
+        const stmt = db.prepare(`
+            SELECT inviter_id, count(*) as count 
+            FROM user_invites 
+            WHERE inviter_id IS NOT NULL 
+            GROUP BY inviter_id 
+            ORDER BY count DESC 
+            LIMIT ?
+        `);
+        return stmt.all(limit);
+    },
+
+    getInvitesStats: () => {
+        const totalInvites = db.prepare('SELECT count(*) as count FROM user_invites').get().count;
+        const topInviters = db.prepare(`
+            SELECT inviter_id, count(*) as count 
+            FROM user_invites 
+            WHERE inviter_id IS NOT NULL 
+            GROUP BY inviter_id 
+            ORDER BY count DESC 
+            LIMIT 5
+        `).all();
+        
+        return { totalInvites, topInviters };
     },
 
     // Deprecated but kept for safety if I missed something

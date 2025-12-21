@@ -8,6 +8,7 @@ import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
 import { LogsView } from './components/LogsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import InvitesStats from './components/InvitesStats';
 import { User } from './types';
 import { authApi } from './api/auth';
 import { usersApi } from './api/users';
@@ -244,6 +245,10 @@ function App() {
               </div>
               
               <DashboardStats users={users} />
+              
+              <div className="mb-8">
+                <InvitesStats />
+              </div>
               
               <ErrorBoundary>
                 <AnalyticsView />

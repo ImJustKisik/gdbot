@@ -1,9 +1,33 @@
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { getConfiguredRole, sendVerificationDM, getAppSetting } = require('../../utils/helpers');
 const { VERIFICATION_CHANNEL_NAME } = require('../../utils/config');
+const db = require('../../db');
 
 async function handleGuildMemberAdd(member) {
     console.log(`New member joined: ${member.user.tag} in guild: ${member.guild.name}`);
+
+    // --- Invite Tracking ---
+    try {
+        const newInvites = await member.guild.invites.fetch();
+        const oldInvites = member.client.invites;
+        
+        const invite = newInvites.find(i => i.uses > (oldInvites.get(i.code) || 0));
+        
+        if (invite) {
+            console.log(`User ${member.user.tag} joined using invite ${invite.code} from ${invite.inviter?.tag}`);
+            db.saveUserInvite(member.id, invite.inviter?.id, invite.code, invite.uses);
+        } else {
+            console.log(`User ${member.user.tag} joined, but no invite increment detected (possibly vanity URL or unknown).`);
+            db.saveUserInvite(member.id, null, 'unknown', 0);
+        }
+
+        // Update cache
+        member.client.invites = new Map(); // Reset and refill to be safe or just update
+        newInvites.each(i => member.client.invites.set(i.code, i.uses));
+        
+    } catch (err) {
+        console.error('Error tracking invite:', err);
+    }
 
     // Add Unverified Role
     const roleUnverified = getConfiguredRole(member.guild, 'roleUnverified');

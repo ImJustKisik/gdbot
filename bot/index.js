@@ -36,6 +36,13 @@ async function startBot() {
                 console.log('Fetching members to populate cache...');
                 await guild.members.fetch();
                 console.log(`Members cached: ${guild.members.cache.size}`);
+
+                // Initialize Invites Cache
+                console.log('Fetching invites to populate cache...');
+                const invites = await guild.invites.fetch();
+                client.invites = new Collection();
+                invites.each(invite => client.invites.set(invite.code, invite.uses));
+                console.log(`Invites cached: ${client.invites.size}`);
             }
         } catch (err) {
             console.error('Error during startup fetch:', err);
