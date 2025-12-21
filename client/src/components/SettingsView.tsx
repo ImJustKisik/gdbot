@@ -147,14 +147,14 @@ export const SettingsView: React.FC = () => {
 
     const getChannelDisplay = (id?: string) => {
         if (!id) return 'Не выбрано';
-        const channel = channels.find(ch => ch.id === id);
-        return channel ? `#${channel.name}` : 'Неизвестный канал';
+        const channel = channels.find(ch => ch.value === id);
+        return channel ? `#${channel.label}` : 'Неизвестный канал';
     };
 
     const getRoleDisplay = (id?: string) => {
         if (!id) return 'Не выбрано';
-        const role = roles.find(r => r.id === id);
-        return role ? role.name : 'Неизвестная роль';
+        const role = roles.find(r => r.value === id);
+        return role ? role.label : 'Неизвестная роль';
     };
 
     if (loading) {
@@ -258,7 +258,7 @@ export const SettingsView: React.FC = () => {
                             />
                             <datalist id="log-channel-options">
                                 {channels.map(channel => (
-                                    <option key={channel.id} value={channel.id} label={`#${channel.name}`} />
+                                    <option key={channel.value} value={channel.value} label={`#${channel.label}`} />
                                 ))}
                             </datalist>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
@@ -275,7 +275,7 @@ export const SettingsView: React.FC = () => {
                             />
                             <datalist id="mod-log-channel-options">
                                 {channels.map(channel => (
-                                    <option key={`${channel.id}-mod`} value={channel.id} label={`#${channel.name}`} />
+                                    <option key={`${channel.value}-mod`} value={channel.value} label={`#${channel.label}`} />
                                 ))}
                             </datalist>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.modLogChannelId)}</p>
@@ -292,7 +292,7 @@ export const SettingsView: React.FC = () => {
                             />
                             <datalist id="verification-channel-options">
                                 {channels.map(channel => (
-                                    <option key={`${channel.id}-verify`} value={channel.id} label={`#${channel.name}`} />
+                                    <option key={`${channel.value}-verify`} value={channel.value} label={`#${channel.label}`} />
                                 ))}
                             </datalist>
                             <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.verificationChannelId)}</p>
@@ -309,7 +309,7 @@ export const SettingsView: React.FC = () => {
                             />
                             <datalist id="role-unverified-options">
                                 {roles.map(role => (
-                                    <option key={`${role.id}-unverified`} value={role.id} label={role.name} />
+                                    <option key={`${role.value}-unverified`} value={role.value} label={role.label} />
                                 ))}
                             </datalist>
                             <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleUnverified)}</p>
@@ -326,7 +326,7 @@ export const SettingsView: React.FC = () => {
                             />
                             <datalist id="role-verified-options">
                                 {roles.map(role => (
-                                    <option key={`${role.id}-verified`} value={role.id} label={role.name} />
+                                    <option key={`${role.value}-verified`} value={role.value} label={role.label} />
                                 ))}
                             </datalist>
                             <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleVerified)}</p>
