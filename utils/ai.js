@@ -331,7 +331,7 @@ const APPEAL_SUMMARY_PROMPT = `
 }
 `;
 
-async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-001") {
+async function askAI(systemPrompt, userText, model = "tngtech/deepseek-r1t2-chimera:free") {
     const apiKey = getNextKey();
     if (!apiKey) return null;
 
