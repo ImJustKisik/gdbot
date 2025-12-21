@@ -81,6 +81,18 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_warnings_user_id ON warnings(user_id);
   CREATE INDEX IF NOT EXISTS idx_users_points ON users_v2(points DESC);
   CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC);
+
+  CREATE TABLE IF NOT EXISTS appeals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    type TEXT, -- 'warn' or 'mute'
+    punishment_id TEXT, -- warning ID or timestamp for mute
+    reason TEXT, -- original punishment reason
+    appeal_text TEXT,
+    ai_summary TEXT,
+    status TEXT DEFAULT 'pending', -- pending, approved, rejected
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // --- Migrations ---
@@ -100,8 +112,8 @@ try {
 // 0.1 Add 'is_monitored' column to users_v2 if missing
 try {
     const tableInfo = db.prepare("PRAGMA table_info(users_v2)").all();
-    const hasMonitored = tableInfo.some(col => col.name === 'is_monitored');
-    if (!hasMonitored && tableInfo.length > 0) {
+    const hasCol = tableInfo.some(col => col.name === 'is_monitored');
+    if (!hasCol && tableInfo.length > 0) {
         console.log("Migrating users_v2 table: Adding 'is_monitored' column...");
         db.exec("ALTER TABLE users_v2 ADD COLUMN is_monitored INTEGER DEFAULT 0");
     }
@@ -362,43 +374,44 @@ module.exports = {
     },
 
     addWarning: (userId, warning) => {
-        const { reason, points, moderator, date, evidence } = warning;
+        const stmt = db.prepare('INSERT INTO warnings (user_id, moderator, reason, points, date) VALUES (?, ?, ?, ?, ?)');
+        const info = stmt.run(userId, warning.moderator, warning.reason, warning.points, warning.date);
         
-        const transaction = db.transaction(() => {
-            // Ensure user exists
-            db.prepare('INSERT OR IGNORE INTO users_v2 (id, points) VALUES (?, 0)').run(userId);
-            
-            // Add warning
-            db.prepare('INSERT INTO warnings (user_id, moderator, reason, points, date, evidence) VALUES (?, ?, ?, ?, ?, ?)').run(
-                userId, moderator, reason, points, date || new Date().toISOString(), evidence || null
-            );
-            
-            // Update points
-            db.prepare('UPDATE users_v2 SET points = points + ? WHERE id = ?').run(points, userId);
-        });
+        // Update user points
+        const user = db.prepare('SELECT * FROM users_v2 WHERE id = ?').get(userId);
+        const currentPoints = user ? user.points : 0;
         
-        transaction();
+        const upsert = db.prepare(`
+            INSERT INTO users_v2 (id, points) VALUES (?, ?)
+            ON CONFLICT(id) DO UPDATE SET points = points + ?
+        `);
+        upsert.run(userId, warning.points, warning.points);
+
+        return info.lastInsertRowid;
     },
 
-    clearPunishments: (userId) => {
-        const transaction = db.transaction(() => {
-            db.prepare('UPDATE users_v2 SET points = 0 WHERE id = ?').run(userId);
-            db.prepare('DELETE FROM warnings WHERE user_id = ?').run(userId);
-        });
-        transaction();
+    createAppeal: (appeal) => {
+        const stmt = db.prepare(`
+            INSERT INTO appeals (user_id, type, punishment_id, reason, appeal_text, ai_summary, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        return stmt.run(
+            appeal.user_id, 
+            appeal.type, 
+            appeal.punishment_id, 
+            appeal.reason, 
+            appeal.appeal_text, 
+            appeal.ai_summary, 
+            appeal.status || 'pending'
+        );
     },
 
-    updateOAuth: (userId, oauthData) => {
-        const { accessToken, refreshToken, guilds, verifiedAt } = oauthData;
-        
-        const transaction = db.transaction(() => {
-            db.prepare('INSERT OR IGNORE INTO users_v2 (id, points) VALUES (?, 0)').run(userId);
-            db.prepare(`
-                INSERT OR REPLACE INTO user_oauth (user_id, access_token, refresh_token, guilds, verified_at) 
-                VALUES (?, ?, ?, ?, ?)
-            `).run(userId, accessToken, refreshToken, JSON.stringify(guilds), verifiedAt);
-        });
-        transaction();
+    getAppeal: (id) => {
+        return db.prepare('SELECT * FROM appeals WHERE id = ?').get(id);
+    },
+
+    updateAppealStatus: (id, status) => {
+        return db.prepare('UPDATE appeals SET status = ? WHERE id = ?').run(status, id);
     },
 
     // --- Settings & Presets (Unchanged) ---

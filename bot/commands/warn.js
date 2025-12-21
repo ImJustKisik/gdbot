@@ -62,13 +62,14 @@ module.exports = {
             moderator: interaction.member.displayName,
             evidence: evidence ? evidence.url : null
         };
-        db.addWarning(targetUser.id, warning);
+        const warningId = db.addWarning(targetUser.id, warning);
         
         const user = db.getUser(targetUser.id);
 
         const logFields = [
             { name: 'Reason', value: reason },
-            { name: 'Points', value: `+${points} (Total: ${user.points})` }
+            { name: 'Points', value: `+${points} (Total: ${user.points})` },
+            { name: 'Warning ID', value: warningId.toString() }
         ];
         if (silent) logFields.push({ name: 'Silent Mode', value: 'True (No DM sent)' });
 
@@ -88,6 +89,8 @@ module.exports = {
         let dmStatus = '✅ DM Sent';
         if (!silent) {
             try {
+                const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
                 const embed = new EmbedBuilder()
                     .setTitle('You have been warned')
                     .setColor('Orange')
@@ -101,9 +104,21 @@ module.exports = {
                     embed.setImage(evidence.url);
                 }
 
-                await targetMember.send({ embeds: [embed] });
-            } catch (e) {
-                dmStatus = '⚠️ DM Failed (Closed DMs)';
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(`appeal_dismiss`)
+                            .setLabel('Понял')
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId(`appeal_start:warn:${warningId}`)
+                            .setLabel('Не согласен')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                await targetUser.send({ embeds: [embed], components: [row] });
+            } catch (error) {
+                dmStatus = '❌ DM Failed (User has DMs off)';
             }
         } else {
             dmStatus = '🔕 Silent (No DM)';

@@ -36,6 +36,35 @@ module.exports = {
 
         await interaction.deferReply();
         await targetMember.timeout(durationMs, reason);
+
+        // Send DM with Appeal Buttons
+        try {
+            const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+            const embed = new EmbedBuilder()
+                .setTitle('You have been muted')
+                .setColor('Red')
+                .addFields(
+                    { name: 'Duration', value: durationStr },
+                    { name: 'Reason', value: reason }
+                );
+
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`appeal_dismiss`)
+                        .setLabel('Понял')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`appeal_start:mute:${Date.now()}`) // Use timestamp as ID for mutes since we don't store them
+                        .setLabel('Не согласен')
+                        .setStyle(ButtonStyle.Danger)
+                );
+
+            await targetUser.send({ embeds: [embed], components: [row] });
+        } catch (e) {
+            console.log('Could not send DM to muted user');
+        }
+
         await interaction.editReply({ content: `✅ Muted ${targetUser.tag} for ${durationStr}. Reason: ${reason}` });
     }
 };

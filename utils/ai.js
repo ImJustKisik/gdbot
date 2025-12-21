@@ -289,4 +289,83 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
     }
 }
 
-module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES };
+const APPEAL_FILTER_PROMPT = `
+Ты — AI-фильтр для системы апелляций Discord сервера.
+Твоя задача — проверить текст апелляции на адекватность.
+
+Критерии ОТКЛОНЕНИЯ (valid: false):
+1. Бессмысленный набор букв/символов ("ываыва", "123123").
+2. Спам или реклама.
+3. Прямые оскорбления без аргументации ("админ лох", "пошли нахер").
+4. Троллинг ("разбаньте пж я больше не буду" - если это выглядит как явный рофл).
+5. Слишком короткий текст, не несущий смысла ("нет", "не согласен").
+
+Критерии ОДОБРЕНИЯ (valid: true):
+1. Любая попытка объяснить свою позицию.
+2. Эмоциональный, но осмысленный текст.
+3. "Я не знал правил", "Это был не я" и т.д.
+
+Ответь ТОЛЬКО JSON объектом:
+{
+    "valid": boolean,
+    "reason": "string (краткая причина отклонения для пользователя, на русском)"
+}
+`;
+
+const APPEAL_SUMMARY_PROMPT = `
+Ты — AI-ассистент для модераторов. Твоя задача — составить краткое, нейтральное резюме апелляции.
+
+Контекст наказания:
+{{CONTEXT}}
+
+Твоя задача:
+1. Выдели суть претензии пользователя (почему он не согласен).
+2. Оцени тон сообщения (агрессивный, вежливый, раскаяние).
+3. Составь краткое резюме (2-3 предложения) для модератора.
+
+Ответь ТОЛЬКО JSON объектом:
+{
+    "summary": "string (твое резюме)",
+    "tone": "string (тон сообщения)",
+    "recommendation": "string (твое мнение: стоит ли пересмотреть, исходя из логики, или аргументы слабые)"
+}
+`;
+
+async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-lite-preview-02-05:free") {
+    const apiKey = getNextKey();
+    if (!apiKey) return null;
+
+    try {
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+            model: model,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userText }
+            ]
+        }, {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://discord.com",
+                "X-Title": "Discord Guardian Bot"
+            }
+        });
+        const content = response.data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    } catch (error) {
+        console.error("AI Request Error:", error.response?.data || error.message);
+        return null;
+    }
+}
+
+async function checkAppealValidity(text) {
+    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`);
+}
+
+async function createAppealSummary(appealText, punishmentContext) {
+    const prompt = APPEAL_SUMMARY_PROMPT.replace('{{CONTEXT}}', punishmentContext);
+    return await askAI(prompt, `Текст апелляции: "${appealText}"`);
+}
+
+module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary };
