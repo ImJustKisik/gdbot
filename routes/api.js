@@ -13,6 +13,7 @@ const {
 } = require('../utils/helpers');
 const { DEFAULT_SETTINGS } = require('../utils/config');
 const { requireAuth } = require('../utils/middleware');
+const { DEFAULT_PROMPT, DEFAULT_RULES } = require('../utils/ai');
 
 const router = express.Router();
 
@@ -138,6 +139,15 @@ router.get('/settings/bundle', requireAuth, async (req, res) => {
     try {
         const guild = await getGuild();
         const settings = db.getAllSettings();
+        
+        // Merge with defaults, including AI defaults
+        const mergedSettings = { 
+            ...DEFAULT_SETTINGS, 
+            ...settings,
+            aiPrompt: settings.aiPrompt || DEFAULT_PROMPT,
+            aiRules: settings.aiRules || DEFAULT_RULES
+        };
+
         const presets = db.getPresets();
         const escalations = db.getEscalations();
         
@@ -152,7 +162,7 @@ router.get('/settings/bundle', requireAuth, async (req, res) => {
             .sort((a, b) => a.name.localeCompare(b.name));
 
         res.json({
-            settings: { ...DEFAULT_SETTINGS, ...settings },
+            settings: mergedSettings,
             presets,
             escalations,
             roles,
