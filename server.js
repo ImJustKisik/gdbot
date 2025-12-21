@@ -24,6 +24,9 @@ Sentry.init({
 });
 
 // --- Middleware ---
+// The request handler must be the first middleware on the app
+Sentry.setupExpressErrorHandler(app);
+
 app.set('trust proxy', 1); // Trust Nginx proxy (required for secure cookies behind proxy)
 app.use(cors());
 app.use(express.json());

@@ -1,15 +1,24 @@
 const { PermissionsBitField, MessageFlags } = require('discord.js');
 const { sendVerificationDM } = require('../../utils/helpers');
+const Sentry = require('@sentry/node');
 
 async function handleInteraction(interaction) {
     // Handle Buttons
     if (interaction.isButton() && interaction.customId === 'verify_retry') {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const sent = await sendVerificationDM(interaction.member);
-        if (sent) {
-            await interaction.editReply('Verification code sent to your DMs!');
-        } else {
-            await interaction.editReply('Still cannot send DM. Please check your privacy settings.');
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            const sent = await sendVerificationDM(interaction.member);
+            if (sent) {
+                await interaction.editReply('Verification code sent to your DMs!');
+            } else {
+                await interaction.editReply('Still cannot send DM. Please check your privacy settings.');
+            }
+        } catch (error) {
+            Sentry.captureException(error, {
+                tags: { type: 'button', customId: 'verify_retry' },
+                user: { id: interaction.user.id, username: interaction.user.tag }
+            });
+            console.error(error);
         }
         return;
     }
@@ -25,6 +34,10 @@ async function handleInteraction(interaction) {
         try {
             await command.autocomplete(interaction);
         } catch (error) {
+            Sentry.captureException(error, {
+                tags: { type: 'autocomplete', command: interaction.commandName },
+                user: { id: interaction.user.id, username: interaction.user.tag }
+            });
             console.error(error);
         }
         return;
@@ -50,6 +63,16 @@ async function handleInteraction(interaction) {
     } catch (error) {
         // Ignore "Unknown interaction" errors as they usually mean double-processing or timeout
         if (error.code === 10062) return;
+
+        Sentry.captureException(error, {
+            tags: { type: 'command', command: interaction.commandName },
+            user: { id: interaction.user.id, username: interaction.user.tag },
+            extra: {
+                guildId: interaction.guildId,
+                channelId: interaction.channelId,
+                options: interaction.options.data
+            }
+        });
 
         console.error('Error executing command:', error);
         try {
