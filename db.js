@@ -390,6 +390,19 @@ module.exports = {
         return info.lastInsertRowid;
     },
 
+    getWarning: (id) => {
+        return db.prepare('SELECT * FROM warnings WHERE id = ?').get(id);
+    },
+
+    getWarnings: (userId) => {
+        return db.prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY date DESC').all(userId);
+    },
+
+    clearPunishments: (userId) => {
+        db.prepare('DELETE FROM warnings WHERE user_id = ?').run(userId);
+        db.prepare('UPDATE users_v2 SET points = 0 WHERE id = ?').run(userId);
+    },
+
     createAppeal: (appeal) => {
         const stmt = db.prepare(`
             INSERT INTO appeals (user_id, type, punishment_id, reason, appeal_text, ai_summary, status)
