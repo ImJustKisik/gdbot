@@ -361,28 +361,44 @@ async function analyzeBatch(messages, options = {}) {
     const validMessages = messages.filter(m => m.content && m.content.trim().length > 0);
     if (validMessages.length === 0) return {};
 
-    // --- Run Detoxify for batch ---
-    const messagesWithScores = await Promise.all(validMessages.map(async (msg) => {
-        let toxicityInfo = "";
+    // --- Run Detoxify for batch filtering ---
+    const messagesToAnalyze = [];
+    
+    await Promise.all(validMessages.map(async (msg) => {
+        let shouldSendToAI = true;
+
         if (msg.detoxifyEnabled) {
             try {
                 const scores = await getToxicityScores(msg.content);
                 if (scores) {
-                    const significant = Object.entries(scores)
-                        .filter(([k, v]) => v > 0.01)
-                        .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
-                        .join(", ");
-                    if (significant) {
-                        toxicityInfo = significant;
-                        console.log(`[Detoxify Batch] Scores for "${msg.content.substring(0, 20)}...": ${toxicityInfo}`);
+                    const maxScore = Math.max(...Object.values(scores));
+                    
+                    // FILTER LOGIC: If toxicity is low (< 0.7), skip AI
+                    if (maxScore < 0.7) {
+                        console.log(`[Batcher] Skipping AI for msg ${msg.id}: Toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
+                        shouldSendToAI = false;
+                    } else {
+                        // Log significant scores for debugging
+                        const significant = Object.entries(scores)
+                            .filter(([k, v]) => v > 0.01)
+                            .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
+                            .join(", ");
+                        console.log(`[Detoxify Batch] High toxicity for "${msg.content.substring(0, 20)}...": ${significant}`);
                     }
                 }
             } catch (e) {
                 console.error(`[Detoxify Batch] Error:`, e);
             }
         }
-        return { ...msg, toxicity: toxicityInfo };
+        
+        if (shouldSendToAI) {
+            messagesToAnalyze.push(msg);
+        }
     }));
+
+    if (messagesToAnalyze.length === 0) {
+        return {};
+    }
 
     // Prepare content for AI
     let contentString = "";
@@ -391,12 +407,11 @@ async function analyzeBatch(messages, options = {}) {
             history.map(m => `- ${m.author}: ${m.content}`).join("\n") + 
             "\n\n---\n\n";
     }
-    contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(messagesWithScores.map(m => ({
+    contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(messagesToAnalyze.map(m => ({
         id: m.id,
         author: m.author,
         content: m.content,
-        user_info: m.reputation ? `Points: ${m.reputation.points}, Warnings: ${m.reputation.warningsCount}` : "Unknown",
-        toxicity_scores: m.toxicity || "None"
+        user_info: m.reputation ? `Points: ${m.reputation.points}, Warnings: ${m.reputation.warningsCount}` : "Unknown"
     })));
 
     try {
