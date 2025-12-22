@@ -99,10 +99,6 @@ module.exports = {
                                 .setFooter({ text: 'Powered by Gemini 2.0 Flash' })
                                 .setTimestamp();
 
-                            if (imageAttachment) {
-                                embed.setImage(imageAttachment.url);
-                            }
-
                             if (aiAction !== 'delete') {
                                 embed.addFields({ name: 'Сообщение', value: `[Перейти к сообщению](${message.url})` });
                             }
@@ -128,7 +124,8 @@ module.exports = {
                                     { name: 'Content', value: message.content || '[Image]' },
                                     { name: 'Action Taken', value: aiAction === 'delete' ? 'Message Deleted' : 'Warning Sent' },
                                     { name: 'Link', value: `[Jump to Message](${message.url})` }
-                                ]
+                                ],
+                                imageAttachment ? imageAttachment.url : null
                             );
                         }
                     }
