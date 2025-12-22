@@ -361,6 +361,29 @@ async function analyzeBatch(messages, options = {}) {
     const validMessages = messages.filter(m => m.content && m.content.trim().length > 0);
     if (validMessages.length === 0) return {};
 
+    // --- Run Detoxify for batch ---
+    const messagesWithScores = await Promise.all(validMessages.map(async (msg) => {
+        let toxicityInfo = "";
+        if (msg.detoxifyEnabled) {
+            try {
+                const scores = await getToxicityScores(msg.content);
+                if (scores) {
+                    const significant = Object.entries(scores)
+                        .filter(([k, v]) => v > 0.01)
+                        .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
+                        .join(", ");
+                    if (significant) {
+                        toxicityInfo = significant;
+                        console.log(`[Detoxify Batch] Scores for "${msg.content.substring(0, 20)}...": ${toxicityInfo}`);
+                    }
+                }
+            } catch (e) {
+                console.error(`[Detoxify Batch] Error:`, e);
+            }
+        }
+        return { ...msg, toxicity: toxicityInfo };
+    }));
+
     // Prepare content for AI
     let contentString = "";
     if (history.length > 0) {
@@ -368,11 +391,12 @@ async function analyzeBatch(messages, options = {}) {
             history.map(m => `- ${m.author}: ${m.content}`).join("\n") + 
             "\n\n---\n\n";
     }
-    contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(validMessages.map(m => ({
+    contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(messagesWithScores.map(m => ({
         id: m.id,
         author: m.author,
         content: m.content,
-        user_info: m.reputation ? `Points: ${m.reputation.points}, Warnings: ${m.reputation.warningsCount}` : "Unknown"
+        user_info: m.reputation ? `Points: ${m.reputation.points}, Warnings: ${m.reputation.warningsCount}` : "Unknown",
+        toxicity_scores: m.toxicity || "None"
     })));
 
     try {
