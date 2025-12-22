@@ -17,6 +17,7 @@ const INITIAL_SETTINGS: Settings = {
     aiBatchPrompt: '', // New field
     aiRules: '',
     appealsEnabled: true,
+    appealsPrompt: '', // New field
     appealsChannelId: '',
     ticketsCategoryId: ''
 };
@@ -64,6 +65,7 @@ export const SettingsView: React.FC = () => {
                 aiBatchPrompt: bundleSettings.aiBatchPrompt || '', // New field
                 aiRules: bundleSettings.aiRules || '',
                 appealsEnabled: bundleSettings.appealsEnabled !== undefined ? bundleSettings.appealsEnabled : true,
+                appealsPrompt: bundleSettings.appealsPrompt || '', // New field
                 appealsChannelId: bundleSettings.appealsChannelId || '',
                 ticketsCategoryId: bundleSettings.ticketsCategoryId || ''
             });
@@ -673,6 +675,17 @@ export const SettingsView: React.FC = () => {
                                 </select>
                                 <p className="text-xs text-gray-500 mt-1">Где создавать каналы для рассмотрения</p>
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Appeals Filter Prompt</label>
+                            <p className="text-xs text-gray-500 mb-2">Instructions for validating appeals. Must return <code>{`{ "valid": boolean, "reason": "string" }`}</code> JSON.</p>
+                            <textarea 
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                value={settings.appealsPrompt}
+                                onChange={e => setSettings({...settings, appealsPrompt: e.target.value})}
+                                placeholder="Enter appeals filter prompt..."
+                            />
                         </div>
 
                         <div className="flex justify-end pt-4 border-t border-gray-100">

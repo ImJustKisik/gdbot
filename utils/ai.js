@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db'); // Import DB for logging
+const { getAppSetting } = require('./helpers'); // Import helper for settings
 
 // Initialize keys
 const apiKeys = GENAI_API_KEYS || [];
@@ -544,7 +545,7 @@ const APPEAL_SUMMARY_PROMPT = `
 }
 `;
 
-async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8b", schema = null) {
+async function askAI(systemPrompt, userText, model = "google/gemini-2.0-flash-lite-001", schema = null) {
     const apiKey = getNextKey();
     if (!apiKey) return null;
 
@@ -586,6 +587,7 @@ async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8
 }
 
 async function checkAppealValidity(text) {
+    const prompt = getAppSetting('appealsPrompt') || APPEAL_FILTER_PROMPT;
     const schema = {
         type: "object",
         properties: {
@@ -595,7 +597,7 @@ async function checkAppealValidity(text) {
         required: ["valid", "reason"]
         // additionalProperties: false // Removed for compatibility
     };
-    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`, "meta-llama/llama-guard-3-8b", schema);
+    return await askAI(prompt, `Текст апелляции: "${text}"`, "google/gemini-2.0-flash-lite-001", schema);
 }
 
 async function createAppealSummary(appealText, punishmentContext) {

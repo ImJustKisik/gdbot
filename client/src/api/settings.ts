@@ -15,6 +15,7 @@ export interface Settings {
   aiBatchPrompt?: string; // New field
   aiRules?: string;
   appealsEnabled?: boolean;
+  appealsPrompt?: string; // New field
   appealsChannelId?: string;
   ticketsCategoryId?: string;
 }

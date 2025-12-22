@@ -226,6 +226,7 @@ router.post('/settings', requireAuth, async (req, res) => {
 
         // Appeals Settings
         if (payload.appealsEnabled !== undefined) normalized.appealsEnabled = payload.appealsEnabled;
+        if (payload.appealsPrompt !== undefined) normalized.appealsPrompt = payload.appealsPrompt; // New field
         if (payload.appealsChannelId !== undefined) normalized.appealsChannelId = payload.appealsChannelId;
         if (payload.ticketsCategoryId !== undefined) normalized.ticketsCategoryId = payload.ticketsCategoryId;
 
