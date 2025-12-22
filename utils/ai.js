@@ -214,7 +214,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
         return null;
     }
 
-    const { prompt = DEFAULT_PROMPT, rules = DEFAULT_RULES, history = [], useDetoxify = true } = options;
+    const { prompt = DEFAULT_PROMPT, rules = DEFAULT_RULES, history = [], useDetoxify = true, reputation = null } = options;
 
     // Локальная проверка Detoxify
     let localScores = "";
@@ -263,6 +263,9 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             if (localScores) {
                 userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
             }
+            if (reputation) {
+                userContent.push({ type: "text", text: `\n[User Info]: Points: ${reputation.points}, Warnings: ${reputation.warningsCount}` });
+            }
             
             // Use dedicated IMAGE_API_KEY if available, otherwise fallback to standard rotation
             const token = IMAGE_API_KEY || apiKey;
@@ -308,6 +311,9 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             ];
             if (localScores) {
                 userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
+            }
+            if (reputation) {
+                userContent.push({ type: "text", text: `\n[User Info]: Points: ${reputation.points}, Warnings: ${reputation.warningsCount}` });
             }
             const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
                 model: modelName,
@@ -365,7 +371,8 @@ async function analyzeBatch(messages, options = {}) {
     contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(validMessages.map(m => ({
         id: m.id,
         author: m.author,
-        content: m.content
+        content: m.content,
+        user_info: m.reputation ? `Points: ${m.reputation.points}, Warnings: ${m.reputation.warningsCount}` : "Unknown"
     })));
 
     try {

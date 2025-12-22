@@ -4,11 +4,15 @@ const db = require('../../db');
 const { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES } = require('../../utils/ai');
 const { getAppSetting } = require('../../utils/helpers');
 const messageBatcher = require('../../utils/message-batcher');
+const contextCache = require('../../utils/context-cache');
 
 module.exports = {
     name: Events.MessageCreate,
     async execute(message) {
         if (message.author.bot) return;
+
+        // Update Context Cache immediately
+        contextCache.add(message.channel.id, message);
 
         const user = db.getUser(message.author.id);
         
@@ -39,17 +43,14 @@ module.exports = {
 
             if (!message.content && !imageBuffer) return; // Nothing to analyze
 
-            // Fetch recent messages for context
-            let contextMessages = [];
-            try {
-                const messages = await message.channel.messages.fetch({ limit: 5, before: message.id });
-                contextMessages = messages.map(m => ({
-                    author: m.author.username,
-                    content: m.content
-                })).reverse();
-            } catch (e) {
-                console.warn("[Monitor] Failed to fetch context messages:", e.message);
-            }
+            // Get recent messages from Cache
+            const contextMessages = contextCache.get(message.channel.id, message.id, 5);
+
+            // Prepare Reputation Info
+            const reputation = {
+                points: user.points || 0,
+                warningsCount: Array.isArray(user.warnings) ? user.warnings.length : 0
+            };
 
             // If image is present, process immediately (no batching for images yet)
             if (imageBuffer) {
@@ -59,7 +60,8 @@ module.exports = {
                         prompt: aiPrompt,
                         rules: aiRules,
                         history: contextMessages,
-                        useDetoxify: user.detoxify_enabled !== 0
+                        useDetoxify: user.detoxify_enabled !== 0,
+                        reputation: reputation
                     });
                     
                     if (analysis && analysis.violation) {
@@ -92,7 +94,8 @@ module.exports = {
                 messageBatcher.add(message, contextMessages, {
                     detoxifyEnabled: user.detoxify_enabled !== 0,
                     aiRules: aiRules,
-                    aiPrompt: aiPrompt
+                    aiPrompt: aiPrompt,
+                    reputation: reputation
                 });
             }
         }

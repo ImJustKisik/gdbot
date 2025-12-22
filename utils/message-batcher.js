@@ -74,7 +74,8 @@ class MessageBatcher {
             // Detoxify check is per user, so we might need to run detoxify here or before batching.
             // Ideally, we run detoxify BEFORE adding to batch. If detoxify flags it, we might still want AI confirmation.
             // Or we pass detoxify scores to AI.
-            detoxifyEnabled: item.userSettings.detoxifyEnabled
+            detoxifyEnabled: item.userSettings.detoxifyEnabled,
+            reputation: item.userSettings.reputation
         }));
 
         try {
