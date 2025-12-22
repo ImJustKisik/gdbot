@@ -252,7 +252,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
     try {
         if (imageBuffer && mimeType) {
             // Проверка изображения через Gemini (или LLaVA)
-            const imageModel = "google/gemini-2.0-flash-001"; // или другую подходящую
+            const imageModel = "google/gemini-2.0-flash-lite-001"; // или другую подходящую
             const systemPrompt = "Ты — Lusty Xeno, ИИ-страж Discord. Проверь изображение на NSFW, экстремизм, политику, метагейминг. Ответь ТОЛЬКО JSON: { violation: boolean, reason: string, severity: number, comment: string }";
             const userContent = [
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBuffer.toString('base64')}` } }
@@ -292,8 +292,8 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             const jsonStr = jsonMatch ? jsonMatch[0] : content;
             return JSON.parse(jsonStr);
         } else {
-            // Проверка текста через deepseek-r1t2-chimera
-            const modelName = "tngtech/deepseek-r1t2-chimera:free";
+            // Проверка текста через meta-llama/llama-guard-3-8b
+            const modelName = "meta-llama/llama-guard-3-8b";
             const systemPrompt = prompt.replace('{{RULES}}', rules);
 
             let contextText = "";
@@ -363,7 +363,7 @@ async function analyzeBatch(messages, options = {}) {
     })));
 
     try {
-        const modelName = "tngtech/deepseek-r1t2-chimera:free"; // Or gemini-2.0-flash-001 for speed
+        const modelName = "meta-llama/llama-guard-3-8b"; // Or gemini-2.0-flash-001 for speed
         
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
             model: modelName,
@@ -441,7 +441,7 @@ const APPEAL_SUMMARY_PROMPT = `
 }
 `;
 
-async function askAI(systemPrompt, userText, model = "tngtech/deepseek-r1t2-chimera:free") {
+async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8b") {
     const apiKey = getNextKey();
     if (!apiKey) return null;
 
