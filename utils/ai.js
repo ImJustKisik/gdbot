@@ -250,7 +250,11 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
         if (imageBuffer && mimeType) {
             // Проверка изображения через Gemini (или LLaVA)
             const imageModel = "google/gemini-2.0-flash-lite-001"; // или другую подходящую
-            const systemPrompt = "Ты — Lusty Xeno, ИИ-страж Discord. Проверь изображение на NSFW, экстремизм, политику, метагейминг. Ответь ТОЛЬКО JSON: { violation: boolean, reason: string, severity: number, comment: string }";
+            
+            // Use the configured prompt which contains severity rules
+            const baseSystemPrompt = prompt || DEFAULT_PROMPT;
+            const systemPrompt = `${baseSystemPrompt}\n\nВАЖНО: Примени эти правила к ИЗОБРАЖЕНИЮ. Оценивай визуальный контент по тем же критериям (NSFW, Политика, Экстремизм). Severity должно быть от 0 до 100.`;
+
             const userContent = [
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBuffer.toString('base64')}` } }
             ];
