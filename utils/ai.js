@@ -249,7 +249,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
     try {
         if (imageBuffer && mimeType) {
             // Проверка изображения через Gemini (или LLaVA)
-            const imageModel = "google/gemini-2.0-flash-lite-001"; // или другую подходящую
+            const imageModel = "google/gemini-2.0-flash-001"; // или другую подходящую
             
             // Use the configured prompt which contains severity rules
             const systemPrompt = prompt || DEFAULT_PROMPT;
