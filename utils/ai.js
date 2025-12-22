@@ -550,7 +550,7 @@ async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8
             type: "json_schema",
             json_schema: {
                 name: "ai_response",
-                strict: true,
+                // strict: true, // Disabled for compatibility with non-OpenAI models
                 schema: schema
             }
         };
@@ -581,8 +581,8 @@ async function checkAppealValidity(text) {
             valid: { type: "boolean" },
             reason: { type: "string" }
         },
-        required: ["valid", "reason"],
-        additionalProperties: false
+        required: ["valid", "reason"]
+        // additionalProperties: false // Removed for compatibility
     };
     return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`, "meta-llama/llama-guard-3-8b", schema);
 }
@@ -596,8 +596,8 @@ async function createAppealSummary(appealText, punishmentContext) {
             tone: { type: "string" },
             recommendation: { type: "string" }
         },
-        required: ["summary", "tone", "recommendation"],
-        additionalProperties: false
+        required: ["summary", "tone", "recommendation"]
+        // additionalProperties: false // Removed for compatibility
     };
     return await askAI(prompt, `Текст апелляции: "${appealText}"`, "google/gemini-2.0-flash-lite-001", schema);
 }
