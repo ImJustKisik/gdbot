@@ -161,23 +161,19 @@ const DEFAULT_PROMPT = `
    - НЕТ (просто крик души или мем) -> Violation: FALSE.
 
 ПРИМЕРЫ РЕШЕНИЙ (FEW-SHOT LEARNING):
-- "СБ сосатб" -> { violation: false, severity: 10, reason: "Игровой сленг/мем" }
-- "Код от арсенала 1234" -> { violation: true, severity: 70, reason: "Правило 2.2: Метагейминг (код)" }
-- "Слава [Стране]!" -> { violation: true, severity: 100, reason: "Правило 4.1: Политика" }
-- "@User ты ничтожество, удали игру" -> { violation: true, severity: 65, reason: "Правило 3: Прямое оскорбление" }
-- "Ну ты и бот конечно" (в ответ на фейл в игре) -> { violation: false, severity: 20, reason: "Дружеский подкол" }
-- "Админы дауны" -> { violation: true, severity: 60, reason: "Правило 3.2: Неуважение к администрации" }
+- "СБ сосатб" -> { violation: false, severity: 10, reason: "Игровой сленг/мем", comment: "" }
+- "Код от арсенала 1234" -> { violation: true, severity: 70, reason: "Правило 2.2: Метагейминг (код)", comment: "Не сливай инфу из раунда." }
+- "Слава [Стране]!" -> { violation: true, severity: 100, reason: "Правило 4.1: Политика", comment: "Политика запрещена." }
+- "@User ты ничтожество, удали игру" -> { violation: true, severity: 65, reason: "Правило 3: Прямое оскорбление", comment: "Без оскорблений." }
+- "Ну ты и бот конечно" (в ответ на фейл в игре) -> { violation: false, severity: 20, reason: "Дружеский подкол", comment: "" }
+- "Админы дауны" -> { violation: true, severity: 60, reason: "Правило 3.2: Неуважение к администрации", comment: "Уважай администрацию." }
 
 ПРАВИЛА СЕРВЕРА:
 {{RULES}}
 
-Ответь ТОЛЬКО JSON объектом:
-{ 
-    "violation": boolean, 
-    "reason": "string (укажи номер нарушенного правила, например 'Правило 4.1: Политика')", 
-    "severity": number (0-100),
-    "comment": "string (Комментарий в стиле Lusty Xeno: строгий, но справедливый. Заполнять ТОЛЬКО если violation=true)" 
-}`;
+ВАЖНО: Ты обязан вернуть JSON, соответствующий схеме.
+Если violation=false, поле comment должно быть пустой строкой "".
+`;
 
 const BATCH_SYSTEM_PROMPT = `
 Ты — Lusty Xeno, ИИ-страж Discord сервера.
@@ -200,11 +196,12 @@ const BATCH_SYSTEM_PROMPT = `
 
 Пример выхода:
 {
-  "123456789": { "violation": false },
+  "123456789": { "violation": false, "reason": "", "severity": 0, "comment": "" },
   "987654321": { "violation": true, "reason": "Политика", "severity": 100, "comment": "Здесь не место для политики." }
 }
 
-Ответь ТОЛЬКО валидным JSON.
+ВАЖНО: Для каждого сообщения верни объект со всеми полями: violation, reason, severity, comment.
+Если violation=false, reason и comment должны быть пустыми строками.
 `;
 
 async function analyzeContent(text, imageBuffer = null, mimeType = null, options = {}) {
@@ -275,7 +272,25 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userContent }
-                ]
+                ],
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: "content_analysis",
+                        strict: true,
+                        schema: {
+                            type: "object",
+                            properties: {
+                                violation: { type: "boolean" },
+                                reason: { type: "string" },
+                                severity: { type: "number" },
+                                comment: { type: "string" }
+                            },
+                            required: ["violation", "reason", "severity", "comment"],
+                            additionalProperties: false
+                        }
+                    }
+                }
             }, {
                 headers: {
                     "Authorization": `Bearer ${token}`,
@@ -423,7 +438,31 @@ async function analyzeBatch(messages, options = {}) {
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: contentString }
-            ]
+            ],
+            response_format: {
+                type: "json_schema",
+                json_schema: {
+                    name: "batch_analysis",
+                    strict: true,
+                    schema: {
+                        type: "object",
+                        patternProperties: {
+                            "^[0-9]+$": {
+                                type: "object",
+                                properties: {
+                                    violation: { type: "boolean" },
+                                    reason: { type: "string" },
+                                    severity: { type: "number" },
+                                    comment: { type: "string" }
+                                },
+                                required: ["violation"],
+                                additionalProperties: false
+                            }
+                        },
+                        additionalProperties: false
+                    }
+                }
+            }
         }, {
             headers: {
                 "Authorization": `Bearer ${apiKey}`,
@@ -494,18 +533,31 @@ const APPEAL_SUMMARY_PROMPT = `
 }
 `;
 
-async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8b") {
+async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8b", schema = null) {
     const apiKey = getNextKey();
     if (!apiKey) return null;
 
+    const requestBody = {
+        model: model,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userText }
+        ]
+    };
+
+    if (schema) {
+        requestBody.response_format = {
+            type: "json_schema",
+            json_schema: {
+                name: "ai_response",
+                strict: true,
+                schema: schema
+            }
+        };
+    }
+
     try {
-        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-            model: model,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userText }
-            ]
-        }, {
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", requestBody, {
             headers: {
                 "Authorization": `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
@@ -523,12 +575,31 @@ async function askAI(systemPrompt, userText, model = "meta-llama/llama-guard-3-8
 }
 
 async function checkAppealValidity(text) {
-    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`);
+    const schema = {
+        type: "object",
+        properties: {
+            valid: { type: "boolean" },
+            reason: { type: "string" }
+        },
+        required: ["valid", "reason"],
+        additionalProperties: false
+    };
+    return await askAI(APPEAL_FILTER_PROMPT, `Текст апелляции: "${text}"`, "meta-llama/llama-guard-3-8b", schema);
 }
 
 async function createAppealSummary(appealText, punishmentContext) {
     const prompt = APPEAL_SUMMARY_PROMPT.replace('{{CONTEXT}}', punishmentContext);
-    return await askAI(prompt, `Текст апелляции: "${appealText}"`);
+    const schema = {
+        type: "object",
+        properties: {
+            summary: { type: "string" },
+            tone: { type: "string" },
+            recommendation: { type: "string" }
+        },
+        required: ["summary", "tone", "recommendation"],
+        additionalProperties: false
+    };
+    return await askAI(prompt, `Текст апелляции: "${appealText}"`, "google/gemini-2.0-flash-lite-001", schema);
 }
 
 module.exports = { 
