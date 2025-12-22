@@ -3,6 +3,7 @@ const axios = require('axios');
 const db = require('../../db');
 const { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES } = require('../../utils/ai');
 const { getAppSetting } = require('../../utils/helpers');
+const messageBatcher = require('../../utils/message-batcher');
 
 module.exports = {
     name: Events.MessageCreate,
@@ -17,8 +18,6 @@ module.exports = {
             const aiEnabled = getAppSetting('aiEnabled') !== 'false'; // Default true
             if (!aiEnabled) return;
 
-            const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
-            const aiAction = getAppSetting('aiAction') || 'log'; // log, warn, mute, delete
             const aiPrompt = getAppSetting('aiPrompt') || DEFAULT_PROMPT;
             const aiRules = getAppSetting('aiRules') || DEFAULT_RULES;
 
@@ -40,41 +39,61 @@ module.exports = {
 
             if (!message.content && !imageBuffer) return; // Nothing to analyze
 
-            console.log(`[Monitor] Analyzing content from ${message.author.tag}. Text: "${message.content}", Image: ${!!imageBuffer}`);
-            
+            // Fetch recent messages for context
+            let contextMessages = [];
             try {
-                const analysis = await analyzeContent(message.content, imageBuffer, mimeType, {
-                    prompt: aiPrompt,
-                    rules: aiRules
-                });
-                console.log(`[Monitor] AI Result:`, analysis);
-                
-                if (analysis && analysis.violation) {
-                    // React to the message to show it's being processed/flagged
-                    await message.react('👀');
+                const messages = await message.channel.messages.fetch({ limit: 5, before: message.id });
+                contextMessages = messages.map(m => ({
+                    author: m.author.username,
+                    content: m.content
+                })).reverse();
+            } catch (e) {
+                console.warn("[Monitor] Failed to fetch context messages:", e.message);
+            }
 
-                    if (analysis.severity >= aiThreshold) {
-                        const replyContent = analysis.comment 
-                            ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
-                            : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
+            // If image is present, process immediately (no batching for images yet)
+            if (imageBuffer) {
+                console.log(`[Monitor] Analyzing image from ${message.author.tag}`);
+                try {
+                    const analysis = await analyzeContent(message.content, imageBuffer, mimeType, {
+                        prompt: aiPrompt,
+                        rules: aiRules,
+                        history: contextMessages,
+                        useDetoxify: user.detoxify_enabled !== 0
+                    });
+                    
+                    if (analysis && analysis.violation) {
+                        // ... existing image handling logic ...
+                        await message.react('👀');
+                        const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
+                        const aiAction = getAppSetting('aiAction') || 'log';
 
-                        await message.reply({
-                            content: replyContent,
-                            allowedMentions: { repliedUser: true }
-                        });
+                        if (analysis.severity >= aiThreshold) {
+                            const replyContent = analysis.comment 
+                                ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
+                                : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
 
-                        // TODO: Implement actions (delete, mute) based on aiAction
-                        if (aiAction === 'delete') {
-                            try {
+                            await message.reply({
+                                content: replyContent,
+                                allowedMentions: { repliedUser: true }
+                            });
+
+                            if (aiAction === 'delete') {
                                 await message.delete();
-                            } catch (e) {
-                                console.error('Failed to delete message:', e);
                             }
                         }
                     }
+                } catch (error) {
+                    console.error('Error in AI image monitoring:', error);
                 }
-            } catch (error) {
-                console.error('Error in AI monitoring:', error);
+            } else {
+                // Text only -> Send to Batcher
+                console.log(`[Monitor] Queuing text from ${message.author.tag} for batch analysis`);
+                messageBatcher.add(message, contextMessages, {
+                    detoxifyEnabled: user.detoxify_enabled !== 0,
+                    aiRules: aiRules,
+                    aiPrompt: aiPrompt
+                });
             }
         }
     },

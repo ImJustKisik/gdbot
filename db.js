@@ -93,6 +93,16 @@ db.exec(`
     status TEXT DEFAULT 'pending', -- pending, approved, rejected
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model TEXT,
+    tokens_prompt INTEGER,
+    tokens_completion INTEGER,
+    cost REAL, -- Estimated cost in USD
+    context TEXT, -- 'chat', 'image', 'appeal'
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // --- Migrations ---
@@ -116,6 +126,12 @@ try {
     if (!hasCol && tableInfo.length > 0) {
         console.log("Migrating users_v2 table: Adding 'is_monitored' column...");
         db.exec("ALTER TABLE users_v2 ADD COLUMN is_monitored INTEGER DEFAULT 0");
+    }
+    
+    const hasDetoxify = tableInfo.some(col => col.name === 'detoxify_enabled');
+    if (!hasDetoxify && tableInfo.length > 0) {
+        console.log("Migrating users_v2 table: Adding 'detoxify_enabled' column...");
+        db.exec("ALTER TABLE users_v2 ADD COLUMN detoxify_enabled INTEGER DEFAULT 1");
     }
 } catch (e) {
     console.error("Migration check failed:", e);
@@ -243,6 +259,26 @@ db.exec(`
   );
 `);
 
+function logAiUsage(model, promptTokens, completionTokens, context = 'chat') {
+    try {
+        // Approximate costs per 1M tokens (as of late 2024/early 2025)
+        // Adjust these rates based on your actual provider pricing
+        const rates = {
+            'google/gemini-2.0-flash-001': { input: 0.10, output: 0.40 }, // Example rates
+            'tngtech/deepseek-r1t2-chimera:free': { input: 0, output: 0 }, // Free
+            'default': { input: 0.50, output: 1.50 }
+        };
+
+        const rate = rates[model] || rates['default'];
+        const cost = ((promptTokens / 1000000) * rate.input) + ((completionTokens / 1000000) * rate.output);
+
+        const stmt = db.prepare('INSERT INTO ai_usage (model, tokens_prompt, tokens_completion, cost, context) VALUES (?, ?, ?, ?, ?)');
+        stmt.run(model, promptTokens, completionTokens, cost, context);
+    } catch (e) {
+        console.error("Failed to log AI usage:", e);
+    }
+}
+
 module.exports = {
     // Expose raw db instance for session store
     db: db,
@@ -277,11 +313,13 @@ module.exports = {
     },
 
     setMonitored: (userId, isMonitored) => {
-        const val = isMonitored ? 1 : 0;
-        db.prepare(`
-            INSERT INTO users_v2 (id, points, is_monitored) VALUES (?, 0, ?)
-            ON CONFLICT(id) DO UPDATE SET is_monitored=excluded.is_monitored
-        `).run(userId, val);
+        db.prepare('INSERT OR IGNORE INTO users_v2 (id) VALUES (?)').run(userId);
+        db.prepare('UPDATE users_v2 SET is_monitored = ? WHERE id = ?').run(isMonitored ? 1 : 0, userId);
+    },
+
+    setDetoxifyEnabled: (userId, enabled) => {
+        db.prepare('INSERT OR IGNORE INTO users_v2 (id) VALUES (?)').run(userId);
+        db.prepare('UPDATE users_v2 SET detoxify_enabled = ? WHERE id = ?').run(enabled ? 1 : 0, userId);
     },
 
     // Optimized summary for lists (Dashboard) - Fetches only requested users
@@ -571,6 +609,8 @@ module.exports = {
     getAllUsers: () => {
         console.warn("Deprecated db.getAllUsers() called. Use getUsersSummary() instead.");
         return module.exports.getUsersSummary();
-    }
+    },
+
+    logAiUsage
 };
 

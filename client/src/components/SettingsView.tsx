@@ -27,7 +27,7 @@ export const SettingsView: React.FC = () => {
     const [channels, setChannels] = useState<SelectOption[]>([]);
     const [roles, setRoles] = useState<SelectOption[]>([]);
     
-    const [activeTab, setActiveTab] = useState<'general' | 'automod' | 'presets' | 'ai'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'automod' | 'presets' | 'ai' | 'appeals'>('general');
 
     const [newPresetName, setNewPresetName] = useState('');
     const [newPresetPoints, setNewPresetPoints] = useState(1);
@@ -240,6 +240,17 @@ export const SettingsView: React.FC = () => {
                 >
                     <Brain size={18} />
                     AI Moderation
+                </button>
+                <button
+                    onClick={() => setActiveTab('appeals')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'appeals' 
+                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <List size={18} />
+                    Appeals
                 </button>
             </div>
             
@@ -562,53 +573,6 @@ export const SettingsView: React.FC = () => {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
-                            <div>
-                                <label className="text-white font-medium">Включить систему апелляций</label>
-                                <p className="text-sm text-gray-400">Разрешить пользователям подавать апелляции через AI</p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    className="sr-only peer"
-                                    checked={settings.appealsEnabled}
-                                    onChange={(e) => setSettings({...settings, appealsEnabled: e.target.checked})}
-                                />
-                                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Канал для апелляций</label>
-                                <select 
-                                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                                    value={settings.appealsChannelId}
-                                    onChange={(e) => setSettings({...settings, appealsChannelId: e.target.value})}
-                                >
-                                    <option value="">Выберите канал...</option>
-                                    {channels.map(c => (
-                                        <option key={c.value} value={c.value}>{c.label}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-400 mt-1">Куда бот будет отправлять новые апелляции</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Категория тикетов</label>
-                                <select
-                                    value={settings.ticketsCategoryId}
-                                    onChange={(e) => setSettings({ ...settings, ticketsCategoryId: e.target.value })}
-                                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                                >
-                                    <option value="">Выберите категорию...</option>
-                                    {channels.filter(c => c.label.startsWith('[Category]')).map(c => (
-                                        <option key={c.value} value={c.value}>{c.label.replace('[Category] ', '')}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-400 mt-1">Где создавать каналы для рассмотрения</p>
-                            </div>
-                        </div>
-
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
                             <p className="text-xs text-gray-500 mb-2">The core instructions for the AI. Use <code>{'{{RULES}}'}</code> to insert the rules below.</p>
@@ -639,6 +603,73 @@ export const SettingsView: React.FC = () => {
                             >
                                 <Save size={18} />
                                 {saving ? 'Saving...' : 'Save AI Settings'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Appeals Settings */}
+            {activeTab === 'appeals' && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800">Appeals Configuration</h2>
+                    
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                            <div>
+                                <label className="text-white font-medium">Включить систему апелляций</label>
+                                <p className="text-sm text-gray-400">Разрешить пользователям подавать апелляции через AI</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer"
+                                    checked={settings.appealsEnabled}
+                                    onChange={(e) => setSettings({...settings, appealsEnabled: e.target.checked})}
+                                />
+                                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Канал для апелляций</label>
+                                <select 
+                                    className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-gray-900 focus:outline-none focus:border-blue-500"
+                                    value={settings.appealsChannelId}
+                                    onChange={(e) => setSettings({...settings, appealsChannelId: e.target.value})}
+                                >
+                                    <option value="">Выберите канал...</option>
+                                    {channels.map(c => (
+                                        <option key={c.value} value={c.value}>{c.label}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Куда бот будет отправлять новые апелляции</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Категория тикетов</label>
+                                <select
+                                    value={settings.ticketsCategoryId}
+                                    onChange={(e) => setSettings({ ...settings, ticketsCategoryId: e.target.value })}
+                                    className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-gray-900 focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="">Выберите категорию...</option>
+                                    {channels.filter(c => c.label.startsWith('[Category]')).map(c => (
+                                        <option key={c.value} value={c.value}>{c.label.replace('[Category] ', '')}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Где создавать каналы для рассмотрения</p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4 border-t border-gray-100">
+                            <button 
+                                onClick={handleSaveSettings}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium shadow-sm"
+                            >
+                                <Save size={18} />
+                                {saving ? 'Saving...' : 'Save Appeals Settings'}
                             </button>
                         </div>
                     </div>

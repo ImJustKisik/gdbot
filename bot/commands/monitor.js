@@ -6,11 +6,13 @@ module.exports = {
         .setName('monitor')
         .setDescription('Enable or disable AI monitoring for a user')
         .addUserOption(option => option.setName('user').setDescription('The user to monitor').setRequired(true))
-        .addBooleanOption(option => option.setName('enabled').setDescription('Enable or disable monitoring').setRequired(true)),
+        .addBooleanOption(option => option.setName('enabled').setDescription('Enable or disable monitoring').setRequired(true))
+        .addBooleanOption(option => option.setName('detoxify').setDescription('Enable or disable local Detoxify check (default: true)').setRequired(false)),
 
     async execute(interaction) {
         const targetUser = interaction.options.getUser('user');
         const enabled = interaction.options.getBoolean('enabled');
+        const detoxify = interaction.options.getBoolean('detoxify');
 
         // If disabling, do it immediately without confirmation
         if (!enabled) {
@@ -35,8 +37,13 @@ module.exports = {
         const row = new ActionRowBuilder()
             .addComponents(confirmButton, cancelButton);
 
+        let message = `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`;
+        if (detoxify !== null) {
+            message += `\n\n**Detoxify Check:** ${detoxify ? 'Enabled' : 'Disabled'}`;
+        }
+
         const response = await interaction.editReply({
-            content: `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`,
+            content: message,
             components: [row]
         });
 
@@ -49,7 +56,10 @@ module.exports = {
 
             if (i.customId === 'confirm_monitor') {
                 db.setMonitored(targetUser.id, true);
-                await i.update({ content: `✅ **AI Monitoring Enabled** for ${targetUser}.`, components: [] });
+                if (detoxify !== null) {
+                    db.setDetoxifyEnabled(targetUser.id, detoxify);
+                }
+                await i.update({ content: `✅ **AI Monitoring Enabled** for ${targetUser}.${detoxify !== null ? `\nDetoxify: **${detoxify ? 'ON' : 'OFF'}**` : ''}`, components: [] });
             } else {
                 await i.update({ content: '❌ Action cancelled.', components: [] });
             }

@@ -1,10 +1,36 @@
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { getConfiguredRole, sendVerificationDM, getAppSetting } = require('../../utils/helpers');
 const { VERIFICATION_CHANNEL_NAME } = require('../../utils/config');
+const { checkProfile } = require('../../utils/ai');
 const db = require('../../db');
 
 async function handleGuildMemberAdd(member) {
     console.log(`New member joined: ${member.user.tag} in guild: ${member.guild.name}`);
+
+    // --- AI Profile Check ---
+    try {
+        const aiEnabled = getAppSetting('aiEnabled') !== 'false';
+        if (aiEnabled) {
+            // Fetch full user to get 'about me' (bio) if possible, though bot might not see it without specific intents/cache
+            // For now, we check username and presence status if available
+            const status = member.presence?.activities[0]?.state || "";
+            const analysis = await checkProfile(member.user.username, status, "");
+            
+            if (analysis && analysis.violation && analysis.severity > 80) {
+                console.log(`[Profile Guard] Detected violation for ${member.user.tag}: ${analysis.reason}`);
+                // Auto-kick or warn
+                try {
+                    await member.send(`Ваш профиль нарушает правила сервера: ${analysis.reason}. Пожалуйста, измените его и зайдите снова.`);
+                    await member.kick(`Profile Guard: ${analysis.reason}`);
+                    return; // Stop processing
+                } catch (e) {
+                    console.error("Failed to kick user:", e);
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Profile Guard Error:", e);
+    }
 
     // --- Invite Tracking ---
     try {

@@ -3,6 +3,7 @@ const { GENAI_API_KEYS, IMAGE_API_KEY } = require('./config');
 const { spawn } = require('child_process');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../db'); // Import DB for logging
 
 // Initialize keys
 const apiKeys = GENAI_API_KEYS || [];
@@ -130,6 +131,7 @@ const DEFAULT_RULES = `
 
 const DEFAULT_PROMPT = `
 Ты — Lusty Xeno, ИИ-страж игрового Discord сервера. Твоя задача — защищать чат от реальной грязи, политики и сливов игры, но не душнить за локальные мемы.
+Учитывай контекст предыдущих сообщений, если он предоставлен, чтобы понимать сарказм или ответы на провокации.
 
 ГЛАВНЫЕ ПРИОРИТЕТЫ (УРОВНИ УГРОЗЫ):
 
@@ -177,6 +179,34 @@ const DEFAULT_PROMPT = `
     "comment": "string (Комментарий в стиле Lusty Xeno: строгий, но справедливый. Заполнять ТОЛЬКО если violation=true)" 
 }`;
 
+const BATCH_SYSTEM_PROMPT = `
+Ты — Lusty Xeno, ИИ-страж Discord сервера.
+Твоя задача — проанализировать СПИСОК сообщений на нарушения.
+
+ПРАВИЛА СЕРВЕРА:
+{{RULES}}
+
+ГЛАВНЫЕ ПРИОРИТЕТЫ:
+1. ПОЛИТИКА/ЭКСТРЕМИЗМ -> Severity 100.
+2. NSFW -> Severity 100.
+3. МЕТАГЕЙМИНГ (инфа из текущего раунда) -> Severity 70.
+4. ОСКОРБЛЕНИЯ (агрессия к личности) -> Severity 60+.
+
+ИГНОРИРУЙ:
+- Игровой сленг, маты без адреса, рофлы.
+
+ВХОДНЫЕ ДАННЫЕ: JSON массив сообщений.
+ВЫХОДНЫЕ ДАННЫЕ: JSON объект, где ключи — ID сообщений.
+
+Пример выхода:
+{
+  "123456789": { "violation": false },
+  "987654321": { "violation": true, "reason": "Политика", "severity": 100, "comment": "Здесь не место для политики." }
+}
+
+Ответь ТОЛЬКО валидным JSON.
+`;
+
 async function analyzeContent(text, imageBuffer = null, mimeType = null, options = {}) {
     const apiKey = getNextKey();
     if (!apiKey) {
@@ -184,12 +214,12 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
         return null;
     }
 
-    const { prompt = DEFAULT_PROMPT, rules = DEFAULT_RULES } = options;
+    const { prompt = DEFAULT_PROMPT, rules = DEFAULT_RULES, history = [], useDetoxify = true } = options;
 
     // Локальная проверка Detoxify
     let localScores = "";
     try {
-        if (text) {
+        if (text && useDetoxify) {
             const scores = await getToxicityScores(text);
             if (scores) {
                 const maxScore = Math.max(...Object.values(scores));
@@ -197,10 +227,13 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                     .filter(([k, v]) => v > 0.01)
                     .map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`)
                     .join(", ");
+                
                 if (significant) {
                     localScores = significant;
                     console.log(`[Detoxify] Scores for "${text.substring(0, 20)}...": ${localScores}`);
                 }
+
+                // Skip OpenRouter if toxicity is low AND no image
                 if (!imageBuffer && maxScore < 0.7) {
                     console.log(`[AI] Skipping OpenRouter: Max toxicity ${(maxScore * 100).toFixed(1)}% < 70%`);
                     return null;
@@ -208,6 +241,8 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             } else {
                 console.log("[Detoxify] No response or timeout. Proceeding to OpenRouter.");
             }
+        } else if (!useDetoxify) {
+            console.log("[AI] Skipping Detoxify check (disabled by settings)");
         }
     } catch (e) {
         console.error("Local AI Error:", e);
@@ -247,21 +282,35 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                 }
             });
             const content = response.data.choices[0].message.content;
+            
+            // Log Usage
+            if (response.data.usage) {
+                db.logAiUsage(imageModel, response.data.usage.prompt_tokens, response.data.usage.completion_tokens, 'image');
+            }
+
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             const jsonStr = jsonMatch ? jsonMatch[0] : content;
             return JSON.parse(jsonStr);
         } else {
             // Проверка текста через deepseek-r1t2-chimera
+            const modelName = "tngtech/deepseek-r1t2-chimera:free";
             const systemPrompt = prompt.replace('{{RULES}}', rules);
 
+            let contextText = "";
+            if (history.length > 0) {
+                contextText = "КОНТЕКСТ (Предыдущие сообщения):\n" + 
+                    history.map(m => `- ${m.author}: ${m.content}`).join("\n") + 
+                    "\n\n---\n\n";
+            }
+
             const userContent = [
-                { type: "text", text: `Текст: "${text || '[Нет текста]'}"` }
+                { type: "text", text: `${contextText}АНАЛИЗИРУЕМОЕ СООБЩЕНИЕ:\nТекст: "${text || '[Нет текста]'}"` }
             ];
             if (localScores) {
                 userContent.push({ type: "text", text: `\n[Detoxify]: ${localScores}` });
             }
             const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
-                model: "tngtech/deepseek-r1t2-chimera:free",
+                model: modelName,
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userContent }
@@ -275,6 +324,12 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                 }
             });
             const content = response.data.choices[0].message.content;
+
+            // Log Usage
+            if (response.data.usage) {
+                db.logAiUsage(modelName, response.data.usage.prompt_tokens, response.data.usage.completion_tokens, 'chat');
+            }
+
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             const jsonStr = jsonMatch ? jsonMatch[0] : content;
             return JSON.parse(jsonStr);
@@ -283,9 +338,63 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
         console.error("AI Error:", error.response?.data || error.message);
         if (apiKeys.length > 1) {
             console.log("Retrying with next API key...");
-            return analyzeContent(text, imageBuffer, mimeType);
+            return analyzeContent(text, imageBuffer, mimeType, options);
         }
         return null;
+    }
+}
+
+async function analyzeBatch(messages, options = {}) {
+    const apiKey = getNextKey();
+    if (!apiKey) return {};
+
+    const { prompt = BATCH_SYSTEM_PROMPT, rules = DEFAULT_RULES } = options;
+    const systemPrompt = prompt.replace('{{RULES}}', rules);
+
+    // Filter out empty messages
+    const validMessages = messages.filter(m => m.content && m.content.trim().length > 0);
+    if (validMessages.length === 0) return {};
+
+    // Prepare content for AI
+    const userContent = JSON.stringify(validMessages.map(m => ({
+        id: m.id,
+        author: m.author,
+        content: m.content
+    })));
+
+    try {
+        const modelName = "tngtech/deepseek-r1t2-chimera:free"; // Or gemini-2.0-flash-001 for speed
+        
+        const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+            model: modelName,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userContent }
+            ]
+        }, {
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://discord.com",
+                "X-Title": "Discord Guardian Bot"
+            }
+        });
+
+        const content = response.data.choices[0].message.content;
+        
+        // Log Usage (approximate per message cost is hard, logging total batch)
+        if (response.data.usage) {
+            db.logAiUsage(modelName, response.data.usage.prompt_tokens, response.data.usage.completion_tokens, 'batch');
+        }
+
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return {};
+        
+        return JSON.parse(jsonMatch[0]);
+
+    } catch (error) {
+        console.error("Batch AI Error:", error.response?.data || error.message);
+        return {};
     }
 }
 
@@ -368,4 +477,11 @@ async function createAppealSummary(appealText, punishmentContext) {
     return await askAI(prompt, `Текст апелляции: "${appealText}"`);
 }
 
-module.exports = { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES, checkAppealValidity, createAppealSummary };
+module.exports = { 
+    analyzeContent, 
+    analyzeBatch, // Export new function
+    checkAppealValidity, 
+    createAppealSummary, 
+    DEFAULT_PROMPT, 
+    DEFAULT_RULES 
+};

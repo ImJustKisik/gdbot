@@ -50,8 +50,6 @@ module.exports = {
         roleUnverified: "Unverified",
         roleVerified: "Verified",
         appealsEnabled: true,
-        appealsChannelId: "",
-        appealsPromptFilter: "",
-        appealsPromptSummary: ""
+        appealsChannelId: ""
     }
 };
