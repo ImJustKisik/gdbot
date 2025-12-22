@@ -292,8 +292,8 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             const jsonStr = jsonMatch ? jsonMatch[0] : content;
             return JSON.parse(jsonStr);
         } else {
-            // Проверка текста через meta-llama/llama-guard-3-8b
-            const modelName = "meta-llama/llama-guard-3-8b";
+            // Проверка текста через google/gemini-2.0-flash-lite-001 (Llama Guard плохо следует сложным JSON инструкциям)
+            const modelName = "google/gemini-2.0-flash-lite-001";
             const systemPrompt = prompt.replace('{{RULES}}', rules);
 
             let contextText = "";
@@ -363,7 +363,8 @@ async function analyzeBatch(messages, options = {}) {
     })));
 
     try {
-        const modelName = "meta-llama/llama-guard-3-8b"; // Or gemini-2.0-flash-001 for speed
+        // Use a general purpose model for batching because Llama Guard is too rigid for JSON mapping
+        const modelName = "google/gemini-2.0-flash-lite-001"; 
         
         const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
             model: modelName,
@@ -381,7 +382,7 @@ async function analyzeBatch(messages, options = {}) {
         });
 
         const content = response.data.choices[0].message.content;
-        console.log(`[AI Batch] Raw content length: ${content.length}`);
+        console.log(`[AI Batch] Raw content: ${content.substring(0, 200)}...`); // Log first 200 chars
         
         // Log Usage (approximate per message cost is hard, logging total batch)
         if (response.data.usage) {
