@@ -171,13 +171,21 @@ const EmbedBuilder: React.FC = () => {
                     </div>
                 ) : (
                     <div>
-                        <label className="block text-sm text-gray-400 mb-1">Select Channel</label>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="block text-sm text-gray-400">Select Channel</label>
+                            <button onClick={fetchChannels} className="text-xs text-blue-400 hover:text-blue-300">Refresh List</button>
+                        </div>
                         <select 
                             value={selectedChannel}
                             onChange={e => setSelectedChannel(e.target.value)}
                             className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
                         >
-                            {channels.map(c => <option key={c.id} value={c.id}>#{c.name || c.id}</option>)}
+                            {channels.length === 0 && <option>Loading or no channels...</option>}
+                            {channels.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name ? `#${c.name}` : `Channel ${c.id}`}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 )}
