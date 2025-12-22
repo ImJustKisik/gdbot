@@ -74,53 +74,89 @@ class MessageBatcher {
         }));
 
         try {
-            console.log(`[Batcher] Sending batch of ${batchData.length} messages to AI...`);
+            console.log(`[Batcher] sending batch of ${batchData.length} messages to AI...`);
             const results = await analyzeBatch(batchData, { rules: aiRules, prompt: aiPrompt });
             console.log(`[Batcher] AI Response keys:`, Object.keys(results));
             
-            // Process results
+            // Group violations by user
+            const userViolations = new Map(); // userId -> { messages: [], highestSeverity: 0, bestAnalysis: null }
+
             for (const item of messagesToProcess) {
                 const result = results[item.messageObj.id];
-                if (result) {
-                    await this.handleResult(item.messageObj, result);
+                if (result && result.violation) {
+                    const userId = item.messageObj.author.id;
+                    if (!userViolations.has(userId)) {
+                        userViolations.set(userId, { 
+                            messages: [], 
+                            highestSeverity: 0, 
+                            bestAnalysis: null 
+                        });
+                    }
+                    
+                    const userData = userViolations.get(userId);
+                    userData.messages.push(item.messageObj);
+                    
+                    // Keep the analysis with the highest severity
+                    if (result.severity >= userData.highestSeverity) {
+                        userData.highestSeverity = result.severity;
+                        userData.bestAnalysis = result;
+                    }
                 }
             }
+
+            // Handle violations per user
+            for (const [userId, data] of userViolations) {
+                await this.handleGroupViolation(data.messages, data.bestAnalysis);
+            }
+
         } catch (error) {
             console.error(`[Batcher] Error processing batch for channel ${channelId}:`, error);
         }
     }
 
-    async handleResult(message, analysis) {
-        if (!analysis || !analysis.violation) return;
+    async handleGroupViolation(messages, analysis) {
+        if (!messages.length || !analysis) return;
 
         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
         const aiAction = getAppSetting('aiAction') || 'log';
+        
+        // Use the last message for replying
+        const lastMessage = messages[messages.length - 1];
 
-        console.log(`[Batcher] Violation found for ${message.author.tag}:`, analysis);
+        console.log(`[Batcher] Violation group for ${lastMessage.author.tag} (${messages.length} msgs):`, analysis);
 
         if (analysis.severity >= aiThreshold) {
-            // React
-            try {
-                await message.react('👀');
-            } catch (e) {}
+            // React to all messages
+            for (const msg of messages) {
+                try { await msg.react('👀'); } catch (e) {}
+            }
 
             const replyContent = analysis.comment 
                 ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
                 : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
 
+            // Reply ONLY to the last message
             try {
-                await message.reply({
+                await lastMessage.reply({
                     content: replyContent,
                     allowedMentions: { repliedUser: true }
                 });
-
-                if (aiAction === 'delete') {
-                    await message.delete();
-                }
             } catch (e) {
-                console.error('Failed to take action on message:', e);
+                console.error('Failed to reply to message:', e);
+            }
+
+            // Delete ALL messages if action is delete
+            if (aiAction === 'delete') {
+                for (const msg of messages) {
+                    try { await msg.delete(); } catch (e) {}
+                }
             }
         }
+    }
+
+    // Deprecated: kept for reference or single message handling if needed
+    async handleResult(message, analysis) {
+        // ... implementation replaced by handleGroupViolation logic ...
     }
 }
 
