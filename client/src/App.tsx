@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2 } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -7,6 +7,7 @@ import { UsersList } from './components/UsersList';
 import { VerificationView } from './components/VerificationView';
 import { SettingsView } from './components/SettingsView';
 import { LogsView } from './components/LogsView';
+import EmbedBuilder from './components/EmbedBuilder';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import InvitesStats from './components/InvitesStats';
 import { RecentActivity } from './components/RecentActivity';
@@ -214,6 +215,16 @@ function App() {
             Audit Logs
           </Link>
           <Link 
+            to="/embeds"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              location.pathname === '/embeds' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <MessageSquare size={20} />
+            Embed Builder
+          </Link>
+          <Link 
             to="/invites"
             onClick={() => setIsMobileMenuOpen(false)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
@@ -275,6 +286,7 @@ function App() {
             </>
           } />
           <Route path="/verification" element={<VerificationView />} />
+          <Route path="/embeds" element={<EmbedBuilder />} />
           <Route path="/invites" element={
             <>
               <div className="mb-8">
