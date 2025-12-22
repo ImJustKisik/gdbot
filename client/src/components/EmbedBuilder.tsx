@@ -20,8 +20,8 @@ interface EmbedData {
 }
 
 interface Channel {
-    id: string;
-    name: string;
+    value: string;
+    label: string;
 }
 
 const EmbedBuilder: React.FC = () => {
@@ -49,7 +49,7 @@ const EmbedBuilder: React.FC = () => {
         try {
             const res = await api.get('/channels');
             setChannels(res.data);
-            if (res.data.length > 0) setSelectedChannel(res.data[0].id);
+            if (res.data.length > 0) setSelectedChannel(res.data[0].value);
         } catch (err) {
             console.error('Failed to fetch channels', err);
         }
@@ -182,8 +182,8 @@ const EmbedBuilder: React.FC = () => {
                         >
                             {channels.length === 0 && <option>Loading or no channels...</option>}
                             {channels.map(c => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name ? `#${c.name}` : `Channel ${c.id}`}
+                                <option key={c.value} value={c.value}>
+                                    {c.label}
                                 </option>
                             ))}
                         </select>
