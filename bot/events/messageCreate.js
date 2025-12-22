@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db');
 const { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES } = require('../../utils/ai');
@@ -30,10 +30,14 @@ module.exports = {
             // Actually, if channel is monitored, we should probably use channel settings or default.
             // Let's say: if user is monitored, use user.detoxify_enabled. If not, but channel is, use channel.detoxify_enabled.
             let useDetoxify = true;
+            let pingEnabled = getAppSetting('aiPingUser') !== 'false'; // Default true (Global)
+
             if (user && user.isMonitored) {
                 useDetoxify = user.detoxify_enabled !== 0;
+                pingEnabled = user.ai_ping_enabled !== 0;
             } else if (channelMonitored) {
                 useDetoxify = channelMonitored.detoxify_enabled !== 0;
+                pingEnabled = channelMonitored.ai_ping_enabled !== 0;
             }
 
             let imageBuffer = null;
@@ -82,16 +86,30 @@ module.exports = {
                         await message.react('👀');
                         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
                         const aiAction = getAppSetting('aiAction') || 'log';
-                        const aiPingUser = getAppSetting('aiPingUser') !== 'false'; // Default true
-
+                        
                         if (analysis.severity >= aiThreshold) {
-                            const replyContent = analysis.comment 
-                                ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
-                                : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
+                            const embed = new EmbedBuilder()
+                                .setColor(analysis.severity > 80 ? 'Red' : 'Orange')
+                                .setTitle(analysis.comment ? '⚠️ Lusty Xeno Watch' : '⚠️ AI Monitor Alert')
+                                .setDescription(analysis.comment ? `> *"${analysis.comment}"*` : null)
+                                .addFields(
+                                    { name: 'Причина', value: analysis.reason, inline: true },
+                                    { name: 'Уровень', value: `${analysis.severity}/100`, inline: true }
+                                )
+                                .setFooter({ text: 'Powered by Gemini 2.0 Flash' })
+                                .setTimestamp();
+
+                            if (imageAttachment) {
+                                embed.setImage(imageAttachment.url);
+                            }
+
+                            if (aiAction !== 'delete') {
+                                embed.addFields({ name: 'Сообщение', value: `[Перейти к сообщению](${message.url})` });
+                            }
 
                             await message.reply({
-                                content: replyContent,
-                                allowedMentions: { repliedUser: aiPingUser }
+                                embeds: [embed],
+                                allowedMentions: { repliedUser: pingEnabled }
                             });
 
                             if (aiAction === 'delete') {
@@ -108,7 +126,8 @@ module.exports = {
                                     { name: 'Reason', value: analysis.reason },
                                     { name: 'Severity', value: `${analysis.severity}/100` },
                                     { name: 'Content', value: message.content || '[Image]' },
-                                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Message Deleted' : 'Warning Sent' }
+                                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Message Deleted' : 'Warning Sent' },
+                                    { name: 'Link', value: `[Jump to Message](${message.url})` }
                                 ]
                             );
                         }
@@ -123,7 +142,8 @@ module.exports = {
                     detoxifyEnabled: useDetoxify,
                     aiRules: aiRules,
                     aiPrompt: aiPrompt,
-                    reputation: reputation
+                    reputation: reputation,
+                    pingEnabled: pingEnabled
                 });
             }
         }

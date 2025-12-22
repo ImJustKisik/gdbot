@@ -1,6 +1,7 @@
 const { analyzeBatch } = require('./ai');
 const { getAppSetting, logAction } = require('./helpers');
 const db = require('../db');
+const { EmbedBuilder } = require('discord.js');
 
 class MessageBatcher {
     constructor() {
@@ -88,7 +89,7 @@ class MessageBatcher {
             console.log(`[Batcher] AI Response keys:`, Object.keys(results));
             
             // Group violations by user
-            const userViolations = new Map(); // userId -> { messages: [], highestSeverity: 0, bestAnalysis: null }
+            const userViolations = new Map(); // userId -> { messages: [], highestSeverity: 0, bestAnalysis: null, pingEnabled: true }
 
             for (const item of messagesToProcess) {
                 const result = results[item.messageObj.id];
@@ -98,7 +99,8 @@ class MessageBatcher {
                         userViolations.set(userId, { 
                             messages: [], 
                             highestSeverity: 0, 
-                            bestAnalysis: null 
+                            bestAnalysis: null,
+                            pingEnabled: item.userSettings.pingEnabled !== undefined ? item.userSettings.pingEnabled : true
                         });
                     }
                     
@@ -115,7 +117,7 @@ class MessageBatcher {
 
             // Handle violations per user
             for (const [userId, data] of userViolations) {
-                await this.handleGroupViolation(data.messages, data.bestAnalysis);
+                await this.handleGroupViolation(data.messages, data.bestAnalysis, data.pingEnabled);
             }
 
         } catch (error) {
@@ -123,12 +125,11 @@ class MessageBatcher {
         }
     }
 
-    async handleGroupViolation(messages, analysis) {
+    async handleGroupViolation(messages, analysis, pingEnabled = true) {
         if (!messages.length || !analysis) return;
 
         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
         const aiAction = getAppSetting('aiAction') || 'log';
-        const aiPingUser = getAppSetting('aiPingUser') !== 'false'; // Default true
         const userId = messages[0].author.id;
         
         // Use the last message for replying
@@ -147,15 +148,26 @@ class MessageBatcher {
             const lastAlert = this.userAlertCooldowns.get(userId) || 0;
             
             if (now - lastAlert > this.ALERT_COOLDOWN_MS) {
-                const replyContent = analysis.comment 
-                    ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
-                    : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
+                const embed = new EmbedBuilder()
+                    .setColor(analysis.severity > 80 ? 'Red' : 'Orange')
+                    .setTitle(analysis.comment ? '⚠️ Lusty Xeno Watch' : '⚠️ AI Monitor Alert')
+                    .setDescription(analysis.comment ? `> *"${analysis.comment}"*` : null)
+                    .addFields(
+                        { name: 'Причина', value: analysis.reason, inline: true },
+                        { name: 'Уровень', value: `${analysis.severity}/100`, inline: true }
+                    )
+                    .setFooter({ text: 'Powered by Gemini 2.0 Flash' })
+                    .setTimestamp();
+
+                if (aiAction !== 'delete') {
+                    embed.addFields({ name: 'Сообщение', value: `[Перейти к сообщению](${lastMessage.url})` });
+                }
 
                 // Reply ONLY to the last message
                 try {
                     const reply = await lastMessage.reply({
-                        content: replyContent,
-                        allowedMentions: { repliedUser: aiPingUser }
+                        embeds: [embed],
+                        allowedMentions: { repliedUser: pingEnabled }
                     });
                     
                     // Update cooldown
@@ -192,7 +204,8 @@ class MessageBatcher {
                     { name: 'Severity', value: `${analysis.severity}/100` },
                     { name: 'Messages Count', value: messages.length.toString() },
                     { name: 'Content Sample', value: lastMessage.content.substring(0, 1000) },
-                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Messages Deleted' : 'Warning Sent' }
+                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Messages Deleted' : 'Warning Sent' },
+                    { name: 'Link', value: `[Jump to Message](${lastMessage.url})` }
                 ]
             );
         }

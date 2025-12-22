@@ -139,20 +139,26 @@ try {
         console.log("Migrating users_v2 table: Adding 'detoxify_enabled' column...");
         db.exec("ALTER TABLE users_v2 ADD COLUMN detoxify_enabled INTEGER DEFAULT 1");
     }
+
+    const hasPing = tableInfo.some(col => col.name === 'ai_ping_enabled');
+    if (!hasPing && tableInfo.length > 0) {
+        console.log("Migrating users_v2 table: Adding 'ai_ping_enabled' column...");
+        db.exec("ALTER TABLE users_v2 ADD COLUMN ai_ping_enabled INTEGER DEFAULT 1");
+    }
 } catch (e) {
     console.error("Migration check failed:", e);
 }
 
-// 0.2 Add 'evidence' column to warnings if missing
+// 0.3 Add 'ai_ping_enabled' to monitored_channels
 try {
-    const tableInfo = db.prepare("PRAGMA table_info(warnings)").all();
-    const hasEvidence = tableInfo.some(col => col.name === 'evidence');
-    if (!hasEvidence && tableInfo.length > 0) {
-        console.log("Migrating warnings table: Adding 'evidence' column...");
-        db.exec("ALTER TABLE warnings ADD COLUMN evidence TEXT");
+    const tableInfo = db.prepare("PRAGMA table_info(monitored_channels)").all();
+    const hasPing = tableInfo.some(col => col.name === 'ai_ping_enabled');
+    if (!hasPing && tableInfo.length > 0) {
+        console.log("Migrating monitored_channels table: Adding 'ai_ping_enabled' column...");
+        db.exec("ALTER TABLE monitored_channels ADD COLUMN ai_ping_enabled INTEGER DEFAULT 1");
     }
 } catch (e) {
-    console.error("Migration check failed (warnings):", e);
+    console.error("Migration check failed (monitored_channels):", e);
 }
 
 // 1. JSON to SQLite Blob (Legacy)
@@ -293,7 +299,7 @@ module.exports = {
     
     // Get full user object (Composite) - For backward compatibility and full profile view
     getUser: (userId) => {
-        const user = db.prepare('SELECT points, is_monitored FROM users_v2 WHERE id = ?').get(userId);
+        const user = db.prepare('SELECT points, is_monitored, ai_ping_enabled FROM users_v2 WHERE id = ?').get(userId);
         const warnings = db.prepare('SELECT * FROM warnings WHERE user_id = ? ORDER BY date DESC').all(userId);
         const oauth = db.prepare('SELECT * FROM user_oauth WHERE user_id = ?').get(userId);
         const invite = db.prepare('SELECT * FROM user_invites WHERE user_id = ?').get(userId);
@@ -302,6 +308,7 @@ module.exports = {
             id: userId,
             points: user ? user.points : 0,
             isMonitored: user ? !!user.is_monitored : false,
+            aiPingEnabled: user ? (user.ai_ping_enabled !== 0) : true, // Default true
             warnings: warnings || [],
             oauth: oauth ? {
                 accessToken: oauth.access_token,
@@ -318,9 +325,9 @@ module.exports = {
         };
     },
 
-    setMonitored: (userId, isMonitored) => {
+    setMonitored: (userId, isMonitored, pingEnabled = true) => {
         db.prepare('INSERT OR IGNORE INTO users_v2 (id) VALUES (?)').run(userId);
-        db.prepare('UPDATE users_v2 SET is_monitored = ? WHERE id = ?').run(isMonitored ? 1 : 0, userId);
+        db.prepare('UPDATE users_v2 SET is_monitored = ?, ai_ping_enabled = ? WHERE id = ?').run(isMonitored ? 1 : 0, pingEnabled ? 1 : 0, userId);
     },
 
     setDetoxifyEnabled: (userId, enabled) => {
@@ -618,22 +625,26 @@ module.exports = {
     },
 
     // --- Monitored Channels ---
-    setChannelMonitored: (channelId, enabled, detoxify = true) => {
+    setChannelMonitored: (channelId, enabled, detoxify = true, pingEnabled = true) => {
         if (enabled) {
             db.prepare(`
-                INSERT INTO monitored_channels (channel_id, enabled, detoxify_enabled)
-                VALUES (?, 1, ?)
-                ON CONFLICT(channel_id) DO UPDATE SET enabled = 1, detoxify_enabled = ?
-            `).run(channelId, detoxify ? 1 : 0, detoxify ? 1 : 0);
+                INSERT INTO monitored_channels (channel_id, enabled, detoxify_enabled, ai_ping_enabled)
+                VALUES (?, 1, ?, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET enabled = 1, detoxify_enabled = ?, ai_ping_enabled = ?
+            `).run(channelId, detoxify ? 1 : 0, pingEnabled ? 1 : 0, detoxify ? 1 : 0, pingEnabled ? 1 : 0);
         } else {
             db.prepare('UPDATE monitored_channels SET enabled = 0 WHERE channel_id = ?').run(channelId);
         }
     },
 
     isChannelMonitored: (channelId) => {
-        const row = db.prepare('SELECT enabled, detoxify_enabled FROM monitored_channels WHERE channel_id = ?').get(channelId);
+        const row = db.prepare('SELECT enabled, detoxify_enabled, ai_ping_enabled FROM monitored_channels WHERE channel_id = ?').get(channelId);
         if (!row || !row.enabled) return false;
-        return { enabled: true, detoxify_enabled: row.detoxify_enabled };
+        return { 
+            enabled: true, 
+            detoxify_enabled: row.detoxify_enabled,
+            ai_ping_enabled: row.ai_ping_enabled !== 0 // Default true if null/undefined, but schema has default 1
+        };
     },
 
     getMonitoredChannels: () => {

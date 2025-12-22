@@ -8,13 +8,15 @@ module.exports = {
         .addBooleanOption(option => option.setName('enabled').setDescription('Enable or disable monitoring').setRequired(true))
         .addUserOption(option => option.setName('user').setDescription('The user to monitor').setRequired(false))
         .addChannelOption(option => option.setName('channel').setDescription('The channel to monitor').setRequired(false))
-        .addBooleanOption(option => option.setName('detoxify').setDescription('Enable or disable local Detoxify check (default: true)').setRequired(false)),
+        .addBooleanOption(option => option.setName('detoxify').setDescription('Enable or disable local Detoxify check (default: true)').setRequired(false))
+        .addBooleanOption(option => option.setName('ping').setDescription('Ping user on violation? (default: true)').setRequired(false)),
 
     async execute(interaction) {
         const targetUser = interaction.options.getUser('user');
         const targetChannel = interaction.options.getChannel('channel');
         const enabled = interaction.options.getBoolean('enabled');
         const detoxify = interaction.options.getBoolean('detoxify');
+        const ping = interaction.options.getBoolean('ping');
 
         if (!targetUser && !targetChannel) {
             return interaction.reply({ content: '❌ You must specify either a user or a channel.', ephemeral: true });
@@ -26,8 +28,8 @@ module.exports = {
 
         // --- Channel Monitoring ---
         if (targetChannel) {
-            db.setChannelMonitored(targetChannel.id, enabled, detoxify !== null ? detoxify : true);
-            return interaction.reply({ content: `✅ AI Monitoring for ${targetChannel} has been **${enabled ? 'enabled' : 'disabled'}**.\nDetoxify: **${(detoxify !== null ? detoxify : true) ? 'ON' : 'OFF'}**` });
+            db.setChannelMonitored(targetChannel.id, enabled, detoxify !== null ? detoxify : true, ping !== null ? ping : true);
+            return interaction.reply({ content: `✅ AI Monitoring for ${targetChannel} has been **${enabled ? 'enabled' : 'disabled'}**.\nDetoxify: **${(detoxify !== null ? detoxify : true) ? 'ON' : 'OFF'}**\nPing User: **${(ping !== null ? ping : true) ? 'ON' : 'OFF'}**` });
         }
 
         // --- User Monitoring ---
@@ -58,6 +60,9 @@ module.exports = {
         if (detoxify !== null) {
             message += `\n\n**Detoxify Check:** ${detoxify ? 'Enabled' : 'Disabled'}`;
         }
+        if (ping !== null) {
+            message += `\n**Ping User:** ${ping ? 'Enabled' : 'Disabled'}`;
+        }
 
         const response = await interaction.editReply({
             content: message,
@@ -72,11 +77,11 @@ module.exports = {
             }
 
             if (i.customId === 'confirm_monitor') {
-                db.setMonitored(targetUser.id, true);
+                db.setMonitored(targetUser.id, true, ping !== null ? ping : true);
                 if (detoxify !== null) {
                     db.setDetoxifyEnabled(targetUser.id, detoxify);
                 }
-                await i.update({ content: `✅ **AI Monitoring Enabled** for ${targetUser}.${detoxify !== null ? `\nDetoxify: **${detoxify ? 'ON' : 'OFF'}**` : ''}`, components: [] });
+                await i.update({ content: `✅ **AI Monitoring Enabled** for ${targetUser}.${detoxify !== null ? `\nDetoxify: **${detoxify ? 'ON' : 'OFF'}**` : ''}${ping !== null ? `\nPing User: **${ping ? 'ON' : 'OFF'}**` : ''}`, components: [] });
             } else {
                 await i.update({ content: '❌ Action cancelled.', components: [] });
             }
