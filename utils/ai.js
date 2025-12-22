@@ -192,16 +192,15 @@ const BATCH_SYSTEM_PROMPT = `
 - Игровой сленг, маты без адреса, рофлы.
 
 ВХОДНЫЕ ДАННЫЕ: JSON массив сообщений.
-ВЫХОДНЫЕ ДАННЫЕ: JSON объект, где ключи — ID сообщений.
+ВЫХОДНЫЕ ДАННЫЕ: JSON объект с массивом результатов "results".
 
 Пример выхода:
 {
-  "123456789": { "violation": false, "reason": "", "severity": 0, "comment": "" },
-  "987654321": { "violation": true, "reason": "Политика", "severity": 100, "comment": "Здесь не место для политики." }
+  "results": [
+    { "id": "123456789", "violation": false, "reason": "", "severity": 0, "comment": "" },
+    { "id": "987654321", "violation": true, "reason": "Политика", "severity": 100, "comment": "Здесь не место для политики." }
+  ]
 }
-
-ВАЖНО: Для каждого сообщения верни объект со всеми полями: violation, reason, severity, comment.
-Если violation=false, reason и comment должны быть пустыми строками.
 `;
 
 async function analyzeContent(text, imageBuffer = null, mimeType = null, options = {}) {
@@ -277,7 +276,6 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                     type: "json_schema",
                     json_schema: {
                         name: "content_analysis",
-                        strict: true,
                         schema: {
                             type: "object",
                             properties: {
@@ -286,8 +284,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                                 severity: { type: "number" },
                                 comment: { type: "string" }
                             },
-                            required: ["violation", "reason", "severity", "comment"],
-                            additionalProperties: false
+                            required: ["violation", "reason", "severity", "comment"]
                         }
                     }
                 }
@@ -297,7 +294,8 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://discord.com",
                     "X-Title": "Discord Guardian Bot"
-                }
+                },
+                timeout: 30000 // 30 seconds timeout
             });
             const content = response.data.choices[0].message.content;
             
@@ -342,7 +340,8 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://discord.com",
                     "X-Title": "Discord Guardian Bot"
-                }
+                },
+                timeout: 30000 // 30 seconds timeout
             });
             const content = response.data.choices[0].message.content;
 
@@ -443,23 +442,25 @@ async function analyzeBatch(messages, options = {}) {
                 type: "json_schema",
                 json_schema: {
                     name: "batch_analysis",
-                    strict: true,
                     schema: {
                         type: "object",
-                        patternProperties: {
-                            "^[0-9]+$": {
-                                type: "object",
-                                properties: {
-                                    violation: { type: "boolean" },
-                                    reason: { type: "string" },
-                                    severity: { type: "number" },
-                                    comment: { type: "string" }
-                                },
-                                required: ["violation"],
-                                additionalProperties: false
+                        properties: {
+                            results: {
+                                type: "array",
+                                items: {
+                                    type: "object",
+                                    properties: {
+                                        id: { type: "string" },
+                                        violation: { type: "boolean" },
+                                        reason: { type: "string" },
+                                        severity: { type: "number" },
+                                        comment: { type: "string" }
+                                    },
+                                    required: ["id", "violation", "reason", "severity", "comment"]
+                                }
                             }
                         },
-                        additionalProperties: false
+                        required: ["results"]
                     }
                 }
             }
@@ -469,7 +470,8 @@ async function analyzeBatch(messages, options = {}) {
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://discord.com",
                 "X-Title": "Discord Guardian Bot"
-            }
+            },
+            timeout: 30000 // 30 seconds timeout
         });
 
         const content = response.data.choices[0].message.content;
@@ -483,7 +485,16 @@ async function analyzeBatch(messages, options = {}) {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return {};
         
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        // Convert array back to map for compatibility
+        const resultMap = {};
+        if (parsed.results && Array.isArray(parsed.results)) {
+            for (const res of parsed.results) {
+                resultMap[res.id] = res;
+            }
+        }
+        return resultMap;
 
     } catch (error) {
         console.error("Batch AI Error:", error.response?.data || error.message);

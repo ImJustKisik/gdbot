@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const axios = require('axios');
 const db = require('../../db');
 const { analyzeContent, DEFAULT_PROMPT, DEFAULT_RULES } = require('../../utils/ai');
-const { getAppSetting } = require('../../utils/helpers');
+const { getAppSetting, logAction } = require('../../utils/helpers');
 const messageBatcher = require('../../utils/message-batcher');
 const contextCache = require('../../utils/context-cache');
 
@@ -75,6 +75,8 @@ module.exports = {
                         reputation: reputation
                     });
                     
+                    console.log(`[Monitor] Image analysis result for ${message.author.tag}:`, JSON.stringify(analysis));
+
                     if (analysis && analysis.violation) {
                         // ... existing image handling logic ...
                         await message.react('👀');
@@ -94,6 +96,20 @@ module.exports = {
                             if (aiAction === 'delete') {
                                 await message.delete();
                             }
+
+                            await logAction(
+                                message.guild,
+                                'AI Monitor Alert',
+                                `AI detected a violation in <#${message.channel.id}>`,
+                                'Orange',
+                                [
+                                    { name: 'User', value: `<@${message.author.id}>` },
+                                    { name: 'Reason', value: analysis.reason },
+                                    { name: 'Severity', value: `${analysis.severity}/100` },
+                                    { name: 'Content', value: message.content || '[Image]' },
+                                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Message Deleted' : 'Warning Sent' }
+                                ]
+                            );
                         }
                     }
                 } catch (error) {

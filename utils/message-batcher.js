@@ -1,5 +1,5 @@
 const { analyzeBatch } = require('./ai');
-const { getAppSetting } = require('./helpers');
+const { getAppSetting, logAction } = require('./helpers');
 const db = require('../db');
 
 class MessageBatcher {
@@ -62,7 +62,7 @@ class MessageBatcher {
 
         // Extract rules from the first message (assuming global rules for the batch)
         const aiRules = messagesToProcess[0]?.userSettings?.aiRules;
-        const aiPrompt = messagesToProcess[0]?.userSettings?.aiPrompt;
+        const aiBatchPrompt = getAppSetting('aiBatchPrompt'); // Use global setting
         // Use context from the first message as the "pre-batch" context
         const batchContext = messagesToProcess[0]?.context || [];
 
@@ -82,7 +82,7 @@ class MessageBatcher {
             console.log(`[Batcher] sending batch of ${batchData.length} messages to AI...`);
             const results = await analyzeBatch(batchData, { 
                 rules: aiRules, 
-                prompt: aiPrompt,
+                prompt: aiBatchPrompt, 
                 history: batchContext 
             });
             console.log(`[Batcher] AI Response keys:`, Object.keys(results));
@@ -178,6 +178,22 @@ class MessageBatcher {
                     try { await msg.delete(); } catch (e) {}
                 }
             }
+
+            // Log to channel
+            await logAction(
+                lastMessage.guild,
+                'AI Monitor Alert (Batch)',
+                `AI detected a violation in <#${lastMessage.channel.id}>`,
+                'Orange',
+                [
+                    { name: 'User', value: `<@${userId}>` },
+                    { name: 'Reason', value: analysis.reason },
+                    { name: 'Severity', value: `${analysis.severity}/100` },
+                    { name: 'Messages Count', value: messages.length.toString() },
+                    { name: 'Content Sample', value: lastMessage.content.substring(0, 1000) },
+                    { name: 'Action Taken', value: aiAction === 'delete' ? 'Messages Deleted' : 'Warning Sent' }
+                ]
+            );
         }
     }
 

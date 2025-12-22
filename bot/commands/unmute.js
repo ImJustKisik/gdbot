@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { logAction } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,6 +20,18 @@ module.exports = {
         }
         await interaction.deferReply();
         await targetMember.timeout(null, 'Unmuted by command');
+
+        await logAction(
+            interaction.guild,
+            'User Unmuted',
+            `User ${targetUser.tag} was unmuted by ${interaction.user.tag}`,
+            'Green',
+            [
+                { name: 'User', value: `<@${targetUser.id}> (${targetUser.id})` },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` }
+            ]
+        );
+
         await interaction.editReply({ content: `✅ Unmuted ${targetUser.tag}.` });
     }
 };

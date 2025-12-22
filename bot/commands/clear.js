@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const db = require('../../db');
+const { logAction } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,6 +23,17 @@ module.exports = {
         if (targetMember.moderatable && targetMember.communicationDisabledUntilTimestamp > Date.now()) {
             await targetMember.timeout(null, 'Punishments cleared');
         }
+
+        await logAction(
+            interaction.guild,
+            'Punishments Cleared',
+            `Punishments for ${targetUser.tag} were cleared by ${interaction.user.tag}`,
+            'Green',
+            [
+                { name: 'User', value: `<@${targetUser.id}> (${targetUser.id})` },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` }
+            ]
+        );
 
         await interaction.editReply({ content: `✅ Cleared points and active timeouts for ${targetUser.tag}.` });
     }

@@ -12,6 +12,7 @@ export interface Settings {
   aiThreshold?: number;
   aiAction?: string;
   aiPrompt?: string;
+  aiBatchPrompt?: string; // New field
   aiRules?: string;
   appealsEnabled?: boolean;
   appealsChannelId?: string;

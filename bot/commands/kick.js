@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { logAction } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,6 +22,19 @@ module.exports = {
         }
         await interaction.deferReply();
         await targetMember.kick(reason);
+
+        await logAction(
+            interaction.guild,
+            'User Kicked',
+            `User ${targetUser.tag} was kicked by ${interaction.user.tag}`,
+            'Orange',
+            [
+                { name: 'User', value: `<@${targetUser.id}> (${targetUser.id})` },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` },
+                { name: 'Reason', value: reason }
+            ]
+        );
+
         await interaction.editReply({ content: `✅ Kicked ${targetUser.tag}. Reason: ${reason}` });
     }
 };

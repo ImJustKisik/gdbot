@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { logAction } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -36,6 +37,19 @@ module.exports = {
 
         await interaction.deferReply();
         await targetMember.timeout(durationMs, reason);
+
+        await logAction(
+            interaction.guild,
+            'User Muted',
+            `User ${targetUser.tag} was muted by ${interaction.user.tag}`,
+            'Orange',
+            [
+                { name: 'User', value: `<@${targetUser.id}> (${targetUser.id})` },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` },
+                { name: 'Duration', value: durationStr },
+                { name: 'Reason', value: reason }
+            ]
+        );
 
         // Send DM with Appeal Buttons
         try {

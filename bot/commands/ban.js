@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
+const { logAction } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,6 +22,19 @@ module.exports = {
         }
         await interaction.deferReply();
         await targetMember.ban({ reason });
+        
+        await logAction(
+            interaction.guild,
+            'User Banned',
+            `User ${targetUser.tag} was banned by ${interaction.user.tag}`,
+            'Red',
+            [
+                { name: 'User', value: `<@${targetUser.id}> (${targetUser.id})` },
+                { name: 'Moderator', value: `<@${interaction.user.id}>` },
+                { name: 'Reason', value: reason }
+            ]
+        );
+
         await interaction.editReply({ content: `✅ Banned ${targetUser.tag}. Reason: ${reason}` });
     }
 };

@@ -14,6 +14,7 @@ const INITIAL_SETTINGS: Settings = {
     aiThreshold: 60,
     aiAction: 'log',
     aiPrompt: '',
+    aiBatchPrompt: '', // New field
     aiRules: '',
     appealsEnabled: true,
     appealsChannelId: '',
@@ -60,6 +61,7 @@ export const SettingsView: React.FC = () => {
                 aiThreshold: Number(bundleSettings.aiThreshold ?? 60),
                 aiAction: bundleSettings.aiAction || 'log',
                 aiPrompt: bundleSettings.aiPrompt || '',
+                aiBatchPrompt: bundleSettings.aiBatchPrompt || '', // New field
                 aiRules: bundleSettings.aiRules || '',
                 appealsEnabled: bundleSettings.appealsEnabled !== undefined ? bundleSettings.appealsEnabled : true,
                 appealsChannelId: bundleSettings.appealsChannelId || '',
@@ -574,13 +576,24 @@ export const SettingsView: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
-                            <p className="text-xs text-gray-500 mb-2">The core instructions for the AI. Use <code>{'{{RULES}}'}</code> to insert the rules below.</p>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Single Message Prompt (Images/Direct)</label>
+                            <p className="text-xs text-gray-500 mb-2">Instructions for analyzing single messages or images. Must return simple JSON.</p>
                             <textarea 
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-64"
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
                                 value={settings.aiPrompt}
                                 onChange={e => setSettings({...settings, aiPrompt: e.target.value})}
-                                placeholder="Enter system prompt..."
+                                placeholder="Enter prompt for single messages..."
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Batch Analysis Prompt (Text Monitoring)</label>
+                            <p className="text-xs text-gray-500 mb-2">Instructions for analyzing a list of messages. Must return <code>{`{ "results": [...] }`}</code> JSON.</p>
+                            <textarea 
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                value={settings.aiBatchPrompt}
+                                onChange={e => setSettings({...settings, aiBatchPrompt: e.target.value})}
+                                placeholder="Enter prompt for batch analysis..."
                             />
                         </div>
 
