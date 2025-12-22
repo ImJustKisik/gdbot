@@ -590,10 +590,19 @@ router.get('/channels', requireAuth, async (req, res) => {
         const guild = await getGuild();
         if (!guild) return res.status(500).json({ error: 'Guild not found' });
 
+        // Always fetch channels to ensure we have the latest data and names
+        try {
+            await guild.channels.fetch();
+        } catch (e) {
+            console.error("Failed to fetch channels:", e);
+        }
+
         const channels = guild.channels.cache
             .filter(c => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement)
-            .map(c => ({ id: c.id, name: c.name }))
+            .map(c => ({ id: c.id, name: c.name || `Channel ${c.id}` }))
             .sort((a, b) => a.name.localeCompare(b.name));
+        
+        console.log(`[API] Returning ${channels.length} channels`);
 
         res.json(channels);
     } catch (error) {

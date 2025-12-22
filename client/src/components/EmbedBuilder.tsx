@@ -177,7 +177,7 @@ const EmbedBuilder: React.FC = () => {
                             onChange={e => setSelectedChannel(e.target.value)}
                             className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
                         >
-                            {channels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+                            {channels.map(c => <option key={c.id} value={c.id}>#{c.name || c.id}</option>)}
                         </select>
                     </div>
                 )}
