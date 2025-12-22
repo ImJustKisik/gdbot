@@ -59,9 +59,13 @@ module.exports = {
         let message = `⚠️ **Confirmation Required**\nAre you sure you want to enable **AI Monitoring** for ${targetUser}? \n\nThis will analyze their messages for toxicity using AI.`;
         if (detoxify !== null) {
             message += `\n\n**Detoxify Check:** ${detoxify ? 'Enabled' : 'Disabled'}`;
+        } else {
+            message += `\n\n**Detoxify Check:** Enabled (Default)`;
         }
         if (ping !== null) {
             message += `\n**Ping User:** ${ping ? 'Enabled' : 'Disabled'}`;
+        } else {
+            message += `\n**Ping User:** Enabled (Default)`;
         }
 
         const response = await interaction.editReply({

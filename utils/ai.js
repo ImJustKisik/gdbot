@@ -339,7 +339,23 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userContent }
-                ]
+                ],
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: "content_analysis",
+                        schema: {
+                            type: "object",
+                            properties: {
+                                violation: { type: "boolean" },
+                                reason: { type: "string" },
+                                severity: { type: "number" },
+                                comment: { type: "string" }
+                            },
+                            required: ["violation", "reason", "severity", "comment"]
+                        }
+                    }
+                }
             }, {
                 headers: {
                     "Authorization": `Bearer ${apiKey}`,
