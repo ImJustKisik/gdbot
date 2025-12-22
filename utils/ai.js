@@ -252,8 +252,7 @@ async function analyzeContent(text, imageBuffer = null, mimeType = null, options
             const imageModel = "google/gemini-2.0-flash-lite-001"; // или другую подходящую
             
             // Use the configured prompt which contains severity rules
-            const baseSystemPrompt = prompt || DEFAULT_PROMPT;
-            const systemPrompt = `${baseSystemPrompt}\n\nВАЖНО: Примени эти правила к ИЗОБРАЖЕНИЮ. Оценивай визуальный контент по тем же критериям (NSFW, Политика, Экстремизм). Severity должно быть от 0 до 100.`;
+            const systemPrompt = prompt || DEFAULT_PROMPT;
 
             const userContent = [
                 { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBuffer.toString('base64')}` } }
