@@ -4,16 +4,33 @@ const db = require('../../db');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('monitor')
-        .setDescription('Enable or disable AI monitoring for a user')
-        .addUserOption(option => option.setName('user').setDescription('The user to monitor').setRequired(true))
+        .setDescription('Enable or disable AI monitoring for a user or channel')
         .addBooleanOption(option => option.setName('enabled').setDescription('Enable or disable monitoring').setRequired(true))
+        .addUserOption(option => option.setName('user').setDescription('The user to monitor').setRequired(false))
+        .addChannelOption(option => option.setName('channel').setDescription('The channel to monitor').setRequired(false))
         .addBooleanOption(option => option.setName('detoxify').setDescription('Enable or disable local Detoxify check (default: true)').setRequired(false)),
 
     async execute(interaction) {
         const targetUser = interaction.options.getUser('user');
+        const targetChannel = interaction.options.getChannel('channel');
         const enabled = interaction.options.getBoolean('enabled');
         const detoxify = interaction.options.getBoolean('detoxify');
 
+        if (!targetUser && !targetChannel) {
+            return interaction.reply({ content: '❌ You must specify either a user or a channel.', ephemeral: true });
+        }
+
+        if (targetUser && targetChannel) {
+            return interaction.reply({ content: '❌ Please specify only one target (user OR channel).', ephemeral: true });
+        }
+
+        // --- Channel Monitoring ---
+        if (targetChannel) {
+            db.setChannelMonitored(targetChannel.id, enabled, detoxify !== null ? detoxify : true);
+            return interaction.reply({ content: `✅ AI Monitoring for ${targetChannel} has been **${enabled ? 'enabled' : 'disabled'}**.\nDetoxify: **${(detoxify !== null ? detoxify : true) ? 'ON' : 'OFF'}**` });
+        }
+
+        // --- User Monitoring ---
         // If disabling, do it immediately without confirmation
         if (!enabled) {
             db.setMonitored(targetUser.id, false);

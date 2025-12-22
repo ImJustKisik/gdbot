@@ -103,6 +103,12 @@ db.exec(`
     context TEXT, -- 'chat', 'image', 'appeal'
     timestamp TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS monitored_channels (
+    channel_id TEXT PRIMARY KEY,
+    enabled INTEGER DEFAULT 1,
+    detoxify_enabled INTEGER DEFAULT 1
+  );
 `);
 
 // --- Migrations ---
@@ -609,6 +615,29 @@ module.exports = {
     getAllUsers: () => {
         console.warn("Deprecated db.getAllUsers() called. Use getUsersSummary() instead.");
         return module.exports.getUsersSummary();
+    },
+
+    // --- Monitored Channels ---
+    setChannelMonitored: (channelId, enabled, detoxify = true) => {
+        if (enabled) {
+            db.prepare(`
+                INSERT INTO monitored_channels (channel_id, enabled, detoxify_enabled)
+                VALUES (?, 1, ?)
+                ON CONFLICT(channel_id) DO UPDATE SET enabled = 1, detoxify_enabled = ?
+            `).run(channelId, detoxify ? 1 : 0, detoxify ? 1 : 0);
+        } else {
+            db.prepare('UPDATE monitored_channels SET enabled = 0 WHERE channel_id = ?').run(channelId);
+        }
+    },
+
+    isChannelMonitored: (channelId) => {
+        const row = db.prepare('SELECT enabled, detoxify_enabled FROM monitored_channels WHERE channel_id = ?').get(channelId);
+        if (!row || !row.enabled) return false;
+        return { enabled: true, detoxify_enabled: row.detoxify_enabled };
+    },
+
+    getMonitoredChannels: () => {
+        return db.prepare('SELECT * FROM monitored_channels WHERE enabled = 1').all();
     },
 
     logAiUsage

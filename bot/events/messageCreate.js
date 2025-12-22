@@ -15,15 +15,26 @@ module.exports = {
         contextCache.add(message.channel.id, message);
 
         const user = db.getUser(message.author.id);
+        const channelMonitored = db.isChannelMonitored(message.channel.id);
         
-        // Check if user is under observation
-        if (user && user.isMonitored) {
+        // Check if user OR channel is under observation
+        if ((user && user.isMonitored) || channelMonitored) {
             // Check AI Settings
             const aiEnabled = getAppSetting('aiEnabled') !== 'false'; // Default true
             if (!aiEnabled) return;
 
             const aiPrompt = getAppSetting('aiPrompt') || DEFAULT_PROMPT;
             const aiRules = getAppSetting('aiRules') || DEFAULT_RULES;
+
+            // Determine detoxify setting (User setting overrides channel setting if both present? Or OR logic? Let's use OR logic for safety, or prefer user setting if specific)
+            // Actually, if channel is monitored, we should probably use channel settings or default.
+            // Let's say: if user is monitored, use user.detoxify_enabled. If not, but channel is, use channel.detoxify_enabled.
+            let useDetoxify = true;
+            if (user && user.isMonitored) {
+                useDetoxify = user.detoxify_enabled !== 0;
+            } else if (channelMonitored) {
+                useDetoxify = channelMonitored.detoxify_enabled !== 0;
+            }
 
             let imageBuffer = null;
             let mimeType = null;
@@ -60,7 +71,7 @@ module.exports = {
                         prompt: aiPrompt,
                         rules: aiRules,
                         history: contextMessages,
-                        useDetoxify: user.detoxify_enabled !== 0,
+                        useDetoxify: useDetoxify,
                         reputation: reputation
                     });
                     
@@ -92,7 +103,7 @@ module.exports = {
                 // Text only -> Send to Batcher
                 console.log(`[Monitor] Queuing text from ${message.author.tag} for batch analysis`);
                 messageBatcher.add(message, contextMessages, {
-                    detoxifyEnabled: user.detoxify_enabled !== 0,
+                    detoxifyEnabled: useDetoxify,
                     aiRules: aiRules,
                     aiPrompt: aiPrompt,
                     reputation: reputation
