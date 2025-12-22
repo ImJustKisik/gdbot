@@ -218,6 +218,7 @@ router.post('/settings', requireAuth, async (req, res) => {
 
         // AI Settings
         if (payload.aiEnabled !== undefined) normalized.aiEnabled = payload.aiEnabled;
+        if (payload.aiPingUser !== undefined) normalized.aiPingUser = payload.aiPingUser; // New field
         if (payload.aiThreshold !== undefined) normalized.aiThreshold = parseNumberSetting(payload.aiThreshold, 'AI Threshold', { min: 0, max: 100 });
         if (payload.aiAction !== undefined) normalized.aiAction = payload.aiAction;
         if (payload.aiPrompt !== undefined) normalized.aiPrompt = payload.aiPrompt;

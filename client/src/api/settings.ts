@@ -9,6 +9,7 @@ export interface Settings {
   autoMuteThreshold: number;
   autoMuteDuration: number;
   aiEnabled?: boolean;
+  aiPingUser?: boolean; // New field
   aiThreshold?: number;
   aiAction?: string;
   aiPrompt?: string;

@@ -82,6 +82,7 @@ module.exports = {
                         await message.react('👀');
                         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
                         const aiAction = getAppSetting('aiAction') || 'log';
+                        const aiPingUser = getAppSetting('aiPingUser') !== 'false'; // Default true
 
                         if (analysis.severity >= aiThreshold) {
                             const replyContent = analysis.comment 
@@ -90,7 +91,7 @@ module.exports = {
 
                             await message.reply({
                                 content: replyContent,
-                                allowedMentions: { repliedUser: true }
+                                allowedMentions: { repliedUser: aiPingUser }
                             });
 
                             if (aiAction === 'delete') {

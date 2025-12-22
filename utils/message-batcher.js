@@ -128,6 +128,7 @@ class MessageBatcher {
 
         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
         const aiAction = getAppSetting('aiAction') || 'log';
+        const aiPingUser = getAppSetting('aiPingUser') !== 'false'; // Default true
         const userId = messages[0].author.id;
         
         // Use the last message for replying
@@ -154,7 +155,7 @@ class MessageBatcher {
                 try {
                     const reply = await lastMessage.reply({
                         content: replyContent,
-                        allowedMentions: { repliedUser: true }
+                        allowedMentions: { repliedUser: aiPingUser }
                     });
                     
                     // Update cooldown
