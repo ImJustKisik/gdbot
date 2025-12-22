@@ -74,7 +74,9 @@ class MessageBatcher {
         }));
 
         try {
+            console.log(`[Batcher] Sending batch of ${batchData.length} messages to AI...`);
             const results = await analyzeBatch(batchData, { rules: aiRules, prompt: aiPrompt });
+            console.log(`[Batcher] AI Response keys:`, Object.keys(results));
             
             // Process results
             for (const item of messagesToProcess) {

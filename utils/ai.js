@@ -381,6 +381,7 @@ async function analyzeBatch(messages, options = {}) {
         });
 
         const content = response.data.choices[0].message.content;
+        console.log(`[AI Batch] Raw content length: ${content.length}`);
         
         // Log Usage (approximate per message cost is hard, logging total batch)
         if (response.data.usage) {
