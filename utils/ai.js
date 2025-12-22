@@ -348,7 +348,7 @@ async function analyzeBatch(messages, options = {}) {
     const apiKey = getNextKey();
     if (!apiKey) return {};
 
-    const { prompt = BATCH_SYSTEM_PROMPT, rules = DEFAULT_RULES } = options;
+    const { prompt = BATCH_SYSTEM_PROMPT, rules = DEFAULT_RULES, history = [] } = options;
     const systemPrompt = prompt.replace('{{RULES}}', rules);
 
     // Filter out empty messages
@@ -356,7 +356,13 @@ async function analyzeBatch(messages, options = {}) {
     if (validMessages.length === 0) return {};
 
     // Prepare content for AI
-    const userContent = JSON.stringify(validMessages.map(m => ({
+    let contentString = "";
+    if (history.length > 0) {
+        contentString += "PREVIOUS CONTEXT (Do not analyze, just for context):\n" + 
+            history.map(m => `- ${m.author}: ${m.content}`).join("\n") + 
+            "\n\n---\n\n";
+    }
+    contentString += "MESSAGES TO ANALYZE (JSON):\n" + JSON.stringify(validMessages.map(m => ({
         id: m.id,
         author: m.author,
         content: m.content
@@ -370,7 +376,7 @@ async function analyzeBatch(messages, options = {}) {
             model: modelName,
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: userContent }
+                { role: "user", content: contentString }
             ]
         }, {
             headers: {

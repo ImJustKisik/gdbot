@@ -5,8 +5,10 @@ const db = require('../db');
 class MessageBatcher {
     constructor() {
         this.queues = new Map(); // channelId -> { messages: [], timer: null }
+        this.userAlertCooldowns = new Map(); // userId -> timestamp
         this.BATCH_SIZE = 5;
         this.DEBOUNCE_MS = 3000;
+        this.ALERT_COOLDOWN_MS = 15000; // 15 seconds cooldown for alerts
     }
 
     add(message, contextMessages, userSettings) {
@@ -61,6 +63,8 @@ class MessageBatcher {
         // Extract rules from the first message (assuming global rules for the batch)
         const aiRules = messagesToProcess[0]?.userSettings?.aiRules;
         const aiPrompt = messagesToProcess[0]?.userSettings?.aiPrompt;
+        // Use context from the first message as the "pre-batch" context
+        const batchContext = messagesToProcess[0]?.context || [];
 
         const batchData = messagesToProcess.map(item => ({
             id: item.messageObj.id,
@@ -75,7 +79,11 @@ class MessageBatcher {
 
         try {
             console.log(`[Batcher] sending batch of ${batchData.length} messages to AI...`);
-            const results = await analyzeBatch(batchData, { rules: aiRules, prompt: aiPrompt });
+            const results = await analyzeBatch(batchData, { 
+                rules: aiRules, 
+                prompt: aiPrompt,
+                history: batchContext 
+            });
             console.log(`[Batcher] AI Response keys:`, Object.keys(results));
             
             // Group violations by user
@@ -119,6 +127,7 @@ class MessageBatcher {
 
         const aiThreshold = Number(getAppSetting('aiThreshold')) || 60;
         const aiAction = getAppSetting('aiAction') || 'log';
+        const userId = messages[0].author.id;
         
         // Use the last message for replying
         const lastMessage = messages[messages.length - 1];
@@ -131,18 +140,35 @@ class MessageBatcher {
                 try { await msg.react('👀'); } catch (e) {}
             }
 
-            const replyContent = analysis.comment 
-                ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
-                : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
+            // Check Cooldown for Reply
+            const now = Date.now();
+            const lastAlert = this.userAlertCooldowns.get(userId) || 0;
+            
+            if (now - lastAlert > this.ALERT_COOLDOWN_MS) {
+                const replyContent = analysis.comment 
+                    ? `⚠️ **Lusty Xeno Watch**\n> *"${analysis.comment}"*\n\n**Причина:** ${analysis.reason} (Уровень: ${analysis.severity}/100)`
+                    : `⚠️ **AI Monitor Alert**\nReason: ${analysis.reason}\nSeverity: ${analysis.severity}/100`;
 
-            // Reply ONLY to the last message
-            try {
-                await lastMessage.reply({
-                    content: replyContent,
-                    allowedMentions: { repliedUser: true }
-                });
-            } catch (e) {
-                console.error('Failed to reply to message:', e);
+                // Reply ONLY to the last message
+                try {
+                    const reply = await lastMessage.reply({
+                        content: replyContent,
+                        allowedMentions: { repliedUser: true }
+                    });
+                    
+                    // Update cooldown
+                    this.userAlertCooldowns.set(userId, now);
+
+                    // Auto-delete warning after 15 seconds to reduce clutter
+                    setTimeout(() => {
+                        reply.delete().catch(() => {});
+                    }, 15000);
+
+                } catch (e) {
+                    console.error('Failed to reply to message:', e);
+                }
+            } else {
+                console.log(`[Batcher] Skipping alert reply for ${lastMessage.author.tag} (cooldown active)`);
             }
 
             // Delete ALL messages if action is delete
