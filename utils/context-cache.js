@@ -1,9 +1,10 @@
 const { Collection } = require('discord.js');
 
 class ContextCache {
-    constructor(limit = 20) {
+    constructor(limit = 20, maxAgeMs = 10 * 60 * 1000) {
         this.cache = new Collection(); // channelId -> Array of messages
         this.limit = limit;
+        this.maxAgeMs = maxAgeMs;
     }
 
     add(channelId, message) {
@@ -20,6 +21,12 @@ class ContextCache {
             content: message.content,
             timestamp: message.createdTimestamp
         });
+
+        // Drop messages older than maxAgeMs
+        const cutoff = Date.now() - this.maxAgeMs;
+        while (channelCache.length && channelCache[0].timestamp < cutoff) {
+            channelCache.shift();
+        }
 
         if (channelCache.length > this.limit) {
             channelCache.shift();

@@ -46,13 +46,18 @@ module.exports = {
             // Check for images
             const imageAttachment = message.attachments.find(a => a.contentType && a.contentType.startsWith('image/'));
             if (imageAttachment) {
-                try {
-                    console.log(`[Monitor] Downloading image: ${imageAttachment.url}`);
-                    const response = await axios.get(imageAttachment.url, { responseType: 'arraybuffer' });
-                    imageBuffer = Buffer.from(response.data);
-                    mimeType = imageAttachment.contentType;
-                } catch (e) {
-                    console.error("Failed to download image", e);
+                const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB safeguard
+                if (imageAttachment.size && imageAttachment.size > MAX_IMAGE_BYTES) {
+                    console.warn(`[Monitor] Skip image from ${message.author.tag}: size ${(imageAttachment.size / (1024 * 1024)).toFixed(2)}MB exceeds limit ${MAX_IMAGE_BYTES / (1024 * 1024)}MB`);
+                } else {
+                    try {
+                        console.log(`[Monitor] Downloading image: ${imageAttachment.url}`);
+                        const response = await axios.get(imageAttachment.url, { responseType: 'arraybuffer' });
+                        imageBuffer = Buffer.from(response.data);
+                        mimeType = imageAttachment.contentType;
+                    } catch (e) {
+                        console.error("Failed to download image", e);
+                    }
                 }
             }
 

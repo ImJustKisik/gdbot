@@ -87,17 +87,27 @@ async function logAction(guild, title, description, color = 'Blue', fields = [],
         console.error('Failed to save log to DB:', e);
     }
 
-    let targetChannelId = getAppSetting('logChannelId');
-    
+    let targetChannelId = getAppSetting('logChannelId') || null;
+
     if (isModAction) {
         const modLogId = getAppSetting('modLogChannelId');
-        if (modLogId) targetChannelId = modLogId;
+        if (modLogId) {
+            const modChannel = guild.channels.cache.get(modLogId);
+            if (modChannel) {
+                targetChannelId = modLogId;
+            } else {
+                console.warn(`Configured modLogChannelId="${modLogId}" not found. Falling back to logChannelId.`);
+            }
+        }
     }
 
     if (!targetChannelId) return;
 
     const channel = guild.channels.cache.get(targetChannelId);
-    if (!channel) return;
+    if (!channel) {
+        console.warn(`Log channel with id="${targetChannelId}" not found in guild ${guild.id}.`);
+        return;
+    }
 
     const embed = new EmbedBuilder()
         .setTitle(title)
@@ -110,11 +120,10 @@ async function logAction(guild, title, description, color = 'Blue', fields = [],
         embed.setImage(imageUrl);
     }
 
-    try {
-        await channel.send({ embeds: [embed] });
-    } catch (e) {
+    // Fire-and-forget to avoid blocking command handlers; errors are logged.
+    channel.send({ embeds: [embed] }).catch((e) => {
         console.error('Failed to send log:', e);
-    }
+    });
 }
 
 async function generateVerificationMessage(userId) {
