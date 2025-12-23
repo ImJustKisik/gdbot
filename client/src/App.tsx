@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare, Cpu } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -11,6 +11,7 @@ import EmbedBuilder from './components/EmbedBuilder';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import InvitesStats from './components/InvitesStats';
 import { RecentActivity } from './components/RecentActivity';
+import { AiMonitorView } from './components/AiMonitorView';
 import { User } from './types';
 import { authApi } from './api/auth';
 import { usersApi } from './api/users';
@@ -234,6 +235,16 @@ function App() {
             <Share2 size={20} />
             Invites
           </Link>
+          <Link 
+            to="/ai-monitor"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              location.pathname === '/ai-monitor' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Cpu size={20} />
+            AI Usage
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100">
@@ -296,6 +307,7 @@ function App() {
               <InvitesStats />
             </>
           } />
+          <Route path="/ai-monitor" element={<AiMonitorView />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/logs" element={<LogsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />

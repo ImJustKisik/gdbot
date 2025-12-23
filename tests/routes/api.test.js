@@ -12,7 +12,13 @@ jest.mock('../../db', () => ({
     setSetting: jest.fn(),
     getAllSettings: jest.fn(),
     getPresets: jest.fn(),
-    getEscalations: jest.fn()
+    getEscalations: jest.fn(),
+    getAiUsageSummary: jest.fn(),
+    getMonitoredUsers: jest.fn(),
+    getMonitoredChannels: jest.fn(),
+    setMonitored: jest.fn(),
+    setDetoxifyEnabled: jest.fn(),
+    setChannelMonitored: jest.fn()
 }));
 
 jest.mock('../../utils/middleware', () => ({
@@ -31,6 +37,11 @@ jest.mock('../../utils/helpers', () => ({
     isTextBasedGuildChannel: jest.fn(),
     getAppSetting: jest.fn(),
     generateVerificationMessage: jest.fn()
+}));
+
+jest.mock('../../utils/ai', () => ({
+    DEFAULT_PROMPT: 'prompt',
+    DEFAULT_RULES: 'rules'
 }));
 
 jest.mock('../../utils/config', () => ({
@@ -52,6 +63,11 @@ describe('API Routes', () => {
         app = express();
         app.use(bodyParser.json());
         app.use('/api', apiRoutes);
+        // Debug: ensure new routes registered
+        const registeredRoutes = apiRoutes.stack
+            .filter((layer) => layer.route)
+            .map((layer) => layer.route.path);
+        console.log('Registered API routes:', registeredRoutes);
     });
 
     describe('GET /api/users', () => {
@@ -197,6 +213,93 @@ describe('API Routes', () => {
             
             expect(res.status).toBe(200);
             expect(res.body).toEqual(expect.objectContaining({ logChannelId: '123' }));
+        });
+    });
+
+    describe('GET /api/stats/ai/usage', () => {
+        test('returns AI usage summary', async () => {
+            const mockSummary = {
+                rangeDays: 30,
+                totals: { requests: 5, promptTokens: 1000, completionTokens: 500, cost: 0.02 },
+                byModel: [],
+                byContext: [],
+                daily: []
+            };
+
+            db.getAiUsageSummary.mockReturnValue(mockSummary);
+
+            const res = await request(app).get('/api/stats/ai/usage');
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual(mockSummary);
+            expect(db.getAiUsageSummary).toHaveBeenCalledWith(30);
+        });
+    });
+
+    describe('Monitoring endpoints', () => {
+        beforeEach(() => {
+            helpers.getGuild.mockResolvedValue({
+                members: {
+                    cache: new Map([
+                        ['1', { user: { username: 'Member1', displayAvatarURL: () => 'avatar-url' } }]
+                    ])
+                },
+                channels: {
+                    cache: new Map([
+                        ['10', { name: 'general' }]
+                    ])
+                }
+            });
+        });
+
+        test('GET /api/monitoring returns users and channels', async () => {
+            db.getMonitoredUsers.mockReturnValue([{ id: '1', detoxifyEnabled: true, aiPingEnabled: true }]);
+            db.getMonitoredChannels.mockReturnValue([{ channel_id: '10', detoxify_enabled: 1, ai_ping_enabled: 0 }]);
+            helpers.fetchGuildMemberSafe.mockResolvedValue({ user: { username: 'Member1', displayAvatarURL: () => 'avatar-url' } });
+            helpers.getAppSetting.mockImplementation((key) => {
+                if (key === 'aiEnabled') return true;
+                if (key === 'aiAction') return 'log';
+                if (key === 'aiThreshold') return 60;
+                return null;
+            });
+
+            const res = await request(app).get('/api/monitoring');
+
+            expect(res.status).toBe(200);
+            expect(res.body.users).toHaveLength(1);
+            expect(res.body.channels).toHaveLength(1);
+            expect(res.body.settings).toEqual(expect.objectContaining({ aiEnabled: true }));
+        });
+
+        test('POST /api/monitoring/users/:id updates user monitoring', async () => {
+            helpers.getGuild.mockResolvedValue({
+                members: { cache: new Map() },
+                channels: { cache: new Map() }
+            });
+            helpers.logAction.mockResolvedValue(true);
+
+            const res = await request(app)
+                .post('/api/monitoring/users/1')
+                .send({ isMonitored: true, detoxifyEnabled: false, aiPingEnabled: true });
+
+            expect(res.status).toBe(200);
+            expect(db.setMonitored).toHaveBeenCalledWith('1', true, true);
+            expect(db.setDetoxifyEnabled).toHaveBeenCalledWith('1', false);
+        });
+
+        test('POST /api/monitoring/channels/:id updates channel monitoring', async () => {
+            helpers.getGuild.mockResolvedValue({
+                members: { cache: new Map() },
+                channels: { cache: new Map([['10', { name: 'general' }]]) }
+            });
+            helpers.logAction.mockResolvedValue(true);
+
+            const res = await request(app)
+                .post('/api/monitoring/channels/10')
+                .send({ enabled: true, detoxifyEnabled: false, aiPingEnabled: false });
+
+            expect(res.status).toBe(200);
+            expect(db.setChannelMonitored).toHaveBeenCalledWith('10', true, false, false);
         });
     });
 

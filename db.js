@@ -674,6 +674,80 @@ module.exports = {
         return db.prepare('SELECT * FROM monitored_channels WHERE enabled = 1').all();
     },
 
+    getMonitoredUsers: () => {
+        const rows = db.prepare(`
+            SELECT id, detoxify_enabled, ai_ping_enabled
+            FROM users_v2
+            WHERE is_monitored = 1
+        `).all();
+
+        return rows.map(row => ({
+            id: row.id,
+            detoxifyEnabled: row.detoxify_enabled !== 0,
+            aiPingEnabled: row.ai_ping_enabled !== 0
+        }));
+    },
+
+    getAiUsageSummary: (days = 30) => {
+        const safeDays = Number.isFinite(days) && days > 0 ? Math.min(Math.round(days), 365) : 30;
+        const windowParam = `-${safeDays} day`;
+    const whereClause = "WHERE timestamp >= datetime('now', ?)";
+        const params = [windowParam];
+
+        const totals = db.prepare(`
+            SELECT 
+                COUNT(*) as requests,
+                COALESCE(SUM(tokens_prompt), 0) as promptTokens,
+                COALESCE(SUM(tokens_completion), 0) as completionTokens,
+                COALESCE(SUM(cost), 0) as cost
+            FROM ai_usage
+            ${whereClause}
+        `).get(...params);
+
+        const byModel = db.prepare(`
+            SELECT model, COUNT(*) as requests,
+                   COALESCE(SUM(tokens_prompt), 0) as promptTokens,
+                   COALESCE(SUM(tokens_completion), 0) as completionTokens,
+                   COALESCE(SUM(cost), 0) as cost
+            FROM ai_usage
+            ${whereClause}
+            GROUP BY model
+            ORDER BY requests DESC
+            LIMIT 10
+        `).all(...params);
+
+        const byContext = db.prepare(`
+            SELECT context, COUNT(*) as requests,
+                   COALESCE(SUM(tokens_prompt), 0) as promptTokens,
+                   COALESCE(SUM(tokens_completion), 0) as completionTokens,
+                   COALESCE(SUM(cost), 0) as cost
+            FROM ai_usage
+            ${whereClause}
+            GROUP BY context
+            ORDER BY requests DESC
+        `).all(...params);
+
+        const daily = db.prepare(`
+            SELECT substr(timestamp, 1, 10) as day,
+                   COUNT(*) as requests,
+                   COALESCE(SUM(tokens_prompt), 0) as promptTokens,
+                   COALESCE(SUM(tokens_completion), 0) as completionTokens,
+                   COALESCE(SUM(cost), 0) as cost
+            FROM ai_usage
+            ${whereClause}
+            GROUP BY day
+            ORDER BY day ASC
+        `).all(...params);
+
+        return {
+            rangeDays: safeDays,
+            totals: totals || { requests: 0, promptTokens: 0, completionTokens: 0, cost: 0 },
+            byModel,
+            byContext,
+            daily
+        };
+    },
+
     // --- Verification States (Persistent) ---
     saveVerificationState: (state, userId, expiresAt) => {
         db.prepare('INSERT OR REPLACE INTO verification_states (state, user_id, expires_at) VALUES (?, ?, ?)').run(state, userId, expiresAt);

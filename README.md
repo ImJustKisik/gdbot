@@ -11,6 +11,7 @@ Discord Guardian is a comprehensive Discord administration system featuring a we
   - Auto-mute after 20 penalty points.
   - View user server lists (if verified via OAuth).
 - **AI Integration**: Google Gemini integration for text analysis (ready for expansion).
+- **AI Usage & Monitor View**: Dashboard page with live AI usage metrics (requests, tokens, cost) plus controls for monitored users and channels.
 
 ## Tech Stack
 
@@ -70,6 +71,11 @@ npm run dev
 
 - `GET /health` — lightweight unauthenticated endpoint that checks Discord client readiness, member-cache freshness, and SQLite availability. It returns `200 OK` during the warm-up period, but once the client stays out of READY for ~2 minutes, the member cache remains empty for >5 minutes, or SQLite fails, the endpoint switches to `503` with detailed reasons.
 - A background monitor polls the same metrics every minute and sends a “Health Monitor Alert” embed to the configured log channel (`logChannelId` or `modLogChannelId`) whenever the degradation persists. This surfaces intent issues, empty caches, or database outages without manual checks.
+
+### AI Usage & Monitor page
+
+- Новая вкладка “AI Usage” в React-дэшборде отображает статистику по таблице `ai_usage` (запросы/токены/стоимость, график за последние 30 дней, топ моделей и контекстов).
+- На той же странице можно быстро просмотреть и отключать мониторинг конкретных пользователей и каналов, не вызывая Slash-команд. Данные отдаются из `/monitoring`, а изменения отправляются POST-запросами на `/monitoring/users/:id` и `/monitoring/channels/:id`.
 
 ## Deployment
 
