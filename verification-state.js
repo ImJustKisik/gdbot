@@ -1,36 +1,37 @@
 const crypto = require('crypto');
+const db = require('./db');
 
 const EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
-const states = new Map();
 
 function createVerificationState(userId) {
     const state = crypto.randomBytes(16).toString('hex');
     const expiresAt = Date.now() + EXPIRATION_MS;
-    states.set(state, { userId, expiresAt });
-    cleanupExpired();
+    
+    // Use DB instead of Map
+    db.saveVerificationState(state, userId, expiresAt);
+    
+    // Cleanup old states occasionally (e.g. 10% chance)
+    if (Math.random() < 0.1) {
+        db.cleanupVerificationStates();
+    }
+    
     return state;
 }
 
 function consumeVerificationState(state) {
-    const entry = states.get(state);
+    const entry = db.getVerificationState(state);
+    
     if (!entry) {
         return null;
     }
 
-    states.delete(state);
-    if (entry.expiresAt < Date.now()) {
+    // Delete immediately to prevent reuse
+    db.deleteVerificationState(state);
+
+    if (entry.expires_at < Date.now()) {
         return null;
     }
-    return entry.userId;
-}
-
-function cleanupExpired() {
-    const now = Date.now();
-    for (const [state, entry] of states.entries()) {
-        if (entry.expiresAt < now) {
-            states.delete(state);
-        }
-    }
+    return entry.user_id;
 }
 
 module.exports = {

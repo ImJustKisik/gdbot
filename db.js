@@ -107,7 +107,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS monitored_channels (
     channel_id TEXT PRIMARY KEY,
     enabled INTEGER DEFAULT 1,
-    detoxify_enabled INTEGER DEFAULT 1
+    detoxify_enabled INTEGER DEFAULT 1,
+    ai_ping_enabled INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS verification_states (
+    state TEXT PRIMARY KEY,
+    user_id TEXT,
+    expires_at INTEGER
   );
 `);
 
@@ -663,6 +670,24 @@ module.exports = {
 
     getMonitoredChannels: () => {
         return db.prepare('SELECT * FROM monitored_channels WHERE enabled = 1').all();
+    },
+
+    // --- Verification States (Persistent) ---
+    saveVerificationState: (state, userId, expiresAt) => {
+        db.prepare('INSERT OR REPLACE INTO verification_states (state, user_id, expires_at) VALUES (?, ?, ?)').run(state, userId, expiresAt);
+    },
+
+    getVerificationState: (state) => {
+        return db.prepare('SELECT * FROM verification_states WHERE state = ?').get(state);
+    },
+
+    deleteVerificationState: (state) => {
+        db.prepare('DELETE FROM verification_states WHERE state = ?').run(state);
+    },
+
+    cleanupVerificationStates: () => {
+        const now = Date.now();
+        db.prepare('DELETE FROM verification_states WHERE expires_at < ?').run(now);
     },
 
     logAiUsage
