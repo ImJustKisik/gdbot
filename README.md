@@ -66,6 +66,11 @@ npm run dev
 - **Dashboard**: http://localhost:5173
 - **Backend API**: http://localhost:3001
 
+### Health Check & Alerts
+
+- `GET /health` — lightweight unauthenticated endpoint that checks Discord client readiness, member-cache freshness, and SQLite availability. It returns `200 OK` during the warm-up period, but once the client stays out of READY for ~2 minutes, the member cache remains empty for >5 minutes, or SQLite fails, the endpoint switches to `503` with detailed reasons.
+- A background monitor polls the same metrics every minute and sends a “Health Monitor Alert” embed to the configured log channel (`logChannelId` or `modLogChannelId`) whenever the degradation persists. This surfaces intent issues, empty caches, or database outages without manual checks.
+
 ## Deployment
 
 To build for production:
