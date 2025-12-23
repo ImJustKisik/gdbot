@@ -6,7 +6,7 @@
 
 This is a **monolithic fullstack application** with three distinct layers that share state through a local SQLite database:
 
-1. **Discord Bot** (`server.js`) - Discord.js v14 client handling events, OAuth callbacks, and member management
+1. **Discord Bot** (`bot/index.js`) - Discord.js v14 client handling events, OAuth callbacks, and member management
 2. **REST API** (`server.js`) - Express server providing `/api/*` endpoints for the dashboard
 3. **React Dashboard** (`client/`) - Vite + TypeScript + Tailwind admin panel
 
@@ -30,7 +30,7 @@ return { ...member.user, ...localUser }; // Discord data + custom fields
 1. New member joins → Bot sends QR code via DM with `state=userId`
 2. User scans → Redirected to Discord OAuth → Returns to `/api/auth/callback?code=X&state=userId`
 3. Backend exchanges code for token → Fetches user's guild list → Saves to `database.sqlite`
-4. **Critical bug**: If Discord drops the `state` parameter, verification fails (see FIXME in callback handler)
+4. **State Handling**: State is stored in SQLite (`verification_states` table) to prevent loss and ensure persistence across restarts.
 
 **State parameter is essential** - it links the OAuth response back to the Discord member who initiated verification.
 
@@ -93,13 +93,11 @@ db.addWarning(userId, { reason: "Spam", points: 5 }); // Transactional write
 
 1. **Member Cache Empty**: If `guild.members.cache.size === 0`, the `/api/users` endpoint returns empty. Ensure `await guild.members.fetch()` runs at startup.
 
-2. **OAuth State Loss**: Discord sometimes drops the `state` parameter. Current code logs "CRITICAL" error but can't recover. Consider implementing a session store or fallback mechanism.
+2. **DM Failures**: `member.send()` throws if user has DMs disabled. Always wrap in try/catch and provide fallback (e.g., post in `#verification` channel).
 
-3. **DM Failures**: `member.send()` throws if user has DMs disabled. Always wrap in try/catch and provide fallback (e.g., post in `#verification` channel).
+3. **Permission Checks**: Before calling `member.timeout()` or `member.roles.add()`, verify `member.moderatable` and role existence. Failures are silent in production.
 
-4. **Permission Checks**: Before calling `member.timeout()` or `member.roles.add()`, verify `member.moderatable` and role existence. Failures are silent in production.
-
-5. **Frontend API Calls**: All use relative paths (`/api/users`). In development, Vite proxies to `localhost:3001`. Ensure `vite.config.js` has correct proxy settings.
+4. **Frontend API Calls**: All use relative paths (`/api/users`). In development, Vite proxies to `localhost:3001`. Ensure `vite.config.js` has correct proxy settings.
 
 ## Key Files Reference
 
@@ -108,7 +106,8 @@ db.addWarning(userId, { reason: "Spam", points: 5 }); // Transactional write
 - `client/src/App.tsx` - Main dashboard with view router (dashboard/verification)
 - `client/src/components/UsersList.tsx` - Member table with warn/clear/view-guilds actions
 - `database.sqlite` - SQLite database file (normalized tables: users_v2, warnings, user_oauth)
-- `database.json` - Legacy data file (kept for backup/migration)
+- `bot/index.js` - Bot initialization and event handling
+- `verification-state.js` - Handles secure state generation and storage for OAuth
 
 ## TypeScript Types
 
@@ -121,7 +120,7 @@ interface User {
     avatar: string;
     points: number;
     warnings: Warning[];
-    status: 'Verified' | 'Muted';
+    status: 'Verified' | 'Muted' | 'Unverified' | 'VerifiedManual';
 }
 ```
 
@@ -129,7 +128,11 @@ Backend constructs this shape in `GET /api/users` by merging Discord member data
 
 ## Testing Strategy
 
-**No automated tests exist**. Manual testing flow:
+**Automated Tests**:
+- `tests/` folder contains integration and unit tests.
+- Run with `npm test`.
+
+**Manual Testing**:
 1. Join Discord server with test account
 2. Verify QR code flow works (check DMs)
 3. Access dashboard at `http://localhost:5173`
@@ -138,6 +141,6 @@ Backend constructs this shape in `GET /api/users` by merging Discord member data
 
 ## Future Enhancements (from codebase comments)
 
-- Google Gemini AI integration exists but isn't wired to moderation (`analyzeText` function defined but unused)
-- `index.js` contains old slash command implementation - seems abandoned in favor of web dashboard
+- **AI Integration**: `analyzeText` is implemented in `utils/ai.js` and used in `bot/events/messageCreate.js` for monitoring users/channels.
 - **Database Migrations**: Implemented in `db.js` (JSON -> SQLite, Schema updates). Future schema changes should be added to the migration logic.
+
