@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare, Cpu } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare, Cpu, RefreshCw, SunMedium, Moon, Sparkles } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -15,6 +15,7 @@ import { AiMonitorView } from './components/AiMonitorView';
 import { User } from './types';
 import { authApi } from './api/auth';
 import { usersApi } from './api/users';
+import { useTheme } from './hooks/useTheme';
 
 interface AuthUser {
   id: string;
@@ -33,6 +34,9 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Check Auth Status
   useEffect(() => {
@@ -61,6 +65,7 @@ function App() {
       if (Array.isArray(data)) {
         setUsers(data);
         setError(null);
+        setLastSyncedAt(new Date());
       } else {
         console.error('Invalid users data:', data);
         setUsers([]);
@@ -81,6 +86,24 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  const handleManualRefresh = async () => {
+    setIsSyncing(true);
+    try {
+      await fetchUsers();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSyncedAt) return 'Нет данных о синхронизации';
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(lastSyncedAt);
+  }, [lastSyncedAt]);
+
   const handleLogin = () => {
     authApi.login();
   };
@@ -92,7 +115,7 @@ function App() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
@@ -100,15 +123,15 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-black px-4">
+        <div className="text-center p-8 glass-panel max-w-md w-full">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-blue-50 rounded-full">
-              <ShieldCheck className="w-12 h-12 text-blue-600" />
+            <div className="p-4 bg-blue-500/10 rounded-full">
+              <ShieldCheck className="w-12 h-12 text-blue-400" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Discord Guardian</h2>
-          <p className="text-gray-500 mb-8">Please log in with Discord to access the moderation dashboard.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Discord Guardian</h2>
+          <p className="text-slate-300 mb-8">Please log in with Discord to access the moderation dashboard.</p>
           
           <button 
             onClick={handleLogin}
@@ -124,10 +147,10 @@ function App() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Connection Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-black px-4">
+        <div className="text-center p-8 glass-panel max-w-md">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Connection Error</h2>
+          <p className="text-slate-200 mb-6">{error}</p>
           <button 
             onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -140,7 +163,8 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className={theme === 'dark' ? 'dark' : ''}>
+      <div className="min-h-screen bg-[var(--color-background)] flex text-gray-900 dark:text-slate-100 transition-colors duration-300">
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
@@ -151,26 +175,33 @@ function App() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:flex flex-col
+        fixed inset-y-0 left-0 z-30 w-72 bg-white/80 dark:bg-slate-950/70 border-r border-gray-200/80 dark:border-white/5 backdrop-blur-xl transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:flex flex-col shadow-2xl/50
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ShieldCheck className="text-blue-600" />
+        <div className="p-6 border-b border-gray-100/70 dark:border-white/5 flex justify-between items-center">
+          <h1 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-white">
+            <ShieldCheck className="text-blue-600 dark:text-blue-400" />
             Discord Guardian
           </h1>
-          <button className="md:hidden text-gray-500" onClick={() => setIsMobileMenuOpen(false)}>
+          <button className="md:hidden text-gray-500 dark:text-gray-300" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={24} />
           </button>
         </div>
         
         <div className="p-4">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-4">
-            <img src={currentUser?.avatar} alt="" className="w-10 h-10 rounded-full" />
+          <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/80 dark:bg-white/5 border border-gray-100/70 dark:border-white/10 mb-4 shadow-sm">
+            <img src={currentUser?.avatar} alt="" className="w-11 h-11 rounded-2xl object-cover" />
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{currentUser?.username}</p>
-              <p className="text-xs text-gray-500">Administrator</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{currentUser?.username}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
             </div>
+            <button 
+              className="ml-auto p-2 rounded-full bg-gray-100/80 dark:bg-white/10 text-gray-600 dark:text-gray-200"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <SunMedium size={18} /> : <Moon size={18} />}
+            </button>
           </div>
         </div>
 
@@ -178,8 +209,8 @@ function App() {
           <Link 
             to="/"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <LayoutDashboard size={20} />
@@ -188,8 +219,8 @@ function App() {
           <Link 
             to="/verification"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/verification' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/verification' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <ShieldCheck size={20} />
@@ -198,8 +229,8 @@ function App() {
           <Link 
             to="/settings"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/settings' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <Settings size={20} />
@@ -208,8 +239,8 @@ function App() {
           <Link 
             to="/logs"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/logs' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/logs' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <List size={20} />
@@ -218,8 +249,8 @@ function App() {
           <Link 
             to="/embeds"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/embeds' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/embeds' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <MessageSquare size={20} />
@@ -228,8 +259,8 @@ function App() {
           <Link 
             to="/invites"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/invites' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/invites' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <Share2 size={20} />
@@ -238,8 +269,8 @@ function App() {
           <Link 
             to="/ai-monitor"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-              location.pathname === '/ai-monitor' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+            className={`nav-pill ${
+              location.pathname === '/ai-monitor' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
             }`}
           >
             <Cpu size={20} />
@@ -247,10 +278,10 @@ function App() {
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
+        <div className="p-4 border-t border-gray-100/70 dark:border-white/5">
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50/70 dark:hover:bg-red-500/10 rounded-lg transition-colors"
           >
             <LogOut size={20} />
             Logout
@@ -259,21 +290,79 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <header className="flex justify-between items-center mb-8 md:hidden">
-          <h1 className="text-xl font-bold text-gray-800">Discord Guardian</h1>
-          <button className="p-2 text-gray-600" onClick={() => setIsMobileMenuOpen(true)}>
-            <Menu />
-          </button>
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <button className="md:hidden p-2 text-gray-600 dark:text-gray-300" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu />
+            </button>
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-gray-500 dark:text-gray-400">Control center</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Discord Guardian</h1>
+            </div>
+            <span className="hidden md:inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Bot online
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleManualRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 border border-gray-100 text-sm font-semibold text-gray-700 shadow-sm hover:-translate-y-0.5 transition-all dark:bg-white/5 dark:text-gray-200 dark:border-white/10"
+              disabled={isSyncing}
+            >
+              <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Refreshing' : 'Refresh data'}
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="p-3 rounded-xl bg-white/70 border border-gray-100 shadow-sm text-gray-700 dark:bg-white/5 dark:text-gray-200 dark:border-white/10"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <SunMedium size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
         </header>
 
         <Routes>
           <Route path="/" element={
             <>
-              <div className="mb-8 flex justify-between items-end">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
-                  <p className="text-gray-500">Server overview and moderation tools</p>
+              <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="glass-panel p-6">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Last synced</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{lastSyncLabel}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="inline-flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
+                      {isSyncing ? 'Sync in progress' : 'Realtime updates' }
+                    </span>
+                    <span>•</span>
+                    <button className="underline text-blue-600 dark:text-blue-300" onClick={handleManualRefresh}>Force sync</button>
+                  </div>
+                </div>
+                <div className="glass-panel p-6">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Quick actions</p>
+                  <div className="flex flex-wrap gap-3">
+                    <Link to="/verification" className="px-4 py-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-300 text-sm font-semibold">
+                      Verification
+                    </Link>
+                    <Link to="/ai-monitor" className="px-4 py-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-300 text-sm font-semibold">
+                      AI Monitor
+                    </Link>
+                    <Link to="/logs" className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 text-sm font-semibold">
+                      Logs
+                    </Link>
+                  </div>
+                </div>
+                <div className="glass-panel p-6 flex items-center gap-4">
+                  <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-500">
+                    <Sparkles />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">AI Insights</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">Monitor toxicity + auto-actions</p>
+                    <Link to="/ai-monitor" className="text-xs text-blue-600 dark:text-blue-300 underline">Open AI Usage</Link>
+                  </div>
                 </div>
               </div>
               
@@ -313,6 +402,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      </div>
     </div>
   );
 }
