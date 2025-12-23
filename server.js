@@ -1,6 +1,6 @@
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
-const { PORT, SESSION_SECRET, REDIRECT_URI, SENTRY_DSN } = require('./utils/config');
+const { PORT, SESSION_SECRET, REDIRECT_URI, SENTRY_DSN, SSL_KEY_PATH, SSL_CERT_PATH } = require('./utils/config');
 
 Sentry.init({
   dsn: SENTRY_DSN,
@@ -16,6 +16,8 @@ Sentry.init({
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const https = require('https');
 const session = require('express-session');
 const SQLiteStore = require('./session-store');
 const { startBot, client } = require('./bot'); // Imports from bot/index.js
@@ -71,10 +73,27 @@ async function init() {
             await new Promise(resolve => client.once('clientReady', resolve));
         }
 
-        app.listen(PORT, () => {
-            console.log(`Server running on port ${PORT}`);
-            console.log(`Dashboard available at http://localhost:${PORT}`);
-        });
+        if (SSL_KEY_PATH && SSL_CERT_PATH) {
+            try {
+                const httpsOptions = {
+                    key: fs.readFileSync(SSL_KEY_PATH),
+                    cert: fs.readFileSync(SSL_CERT_PATH)
+                };
+                https.createServer(httpsOptions, app).listen(PORT, () => {
+                    console.log(`HTTPS Server running on port ${PORT}`);
+                    console.log(`Dashboard available at https://localhost:${PORT}`);
+                });
+            } catch (error) {
+                console.error('Failed to start HTTPS server:', error);
+                console.error('Please check your SSL_KEY_PATH and SSL_CERT_PATH environment variables.');
+                process.exit(1);
+            }
+        } else {
+            app.listen(PORT, () => {
+                console.log(`Server running on port ${PORT}`);
+                console.log(`Dashboard available at http://localhost:${PORT}`);
+            });
+        }
     } catch (error) {
         console.error('Failed to start application:', error);
         process.exit(1);

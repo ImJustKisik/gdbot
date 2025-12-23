@@ -40,6 +40,8 @@ module.exports = {
     SESSION_SECRET,
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
     SENTRY_DSN: process.env.SENTRY_DSN,
+    SSL_KEY_PATH: process.env.SSL_KEY_PATH,
+    SSL_CERT_PATH: process.env.SSL_CERT_PATH,
     VERIFICATION_CHANNEL_NAME: "verification",
     DEFAULT_SETTINGS: {
         logChannelId: "",
