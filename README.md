@@ -12,6 +12,7 @@ Discord Guardian is a comprehensive Discord administration system featuring a we
   - View user server lists (if verified via OAuth).
 - **AI Integration**: Google Gemini integration for text analysis (ready for expansion).
 - **AI Usage & Monitor View**: Dashboard page with live AI usage metrics (requests, tokens, cost) plus controls for monitored users and channels.
+- **Adaptive UX**: Redesigned dashboard shell with glassmorphism cards, command center shortcuts, and instant light/dark theme toggle with persistence.
 
 ## Tech Stack
 
@@ -76,6 +77,12 @@ npm run dev
 
 - Новая вкладка “AI Usage” в React-дэшборде отображает статистику по таблице `ai_usage` (запросы/токены/стоимость, график за последние 30 дней, топ моделей и контекстов).
 - На той же странице можно быстро просмотреть и отключать мониторинг конкретных пользователей и каналов, не вызывая Slash-команд. Данные отдаются из `/monitoring`, а изменения отправляются POST-запросами на `/monitoring/users/:id` и `/monitoring/channels/:id`.
+
+### Обновлённый UX и режимы темы
+
+- В шапке дашборда появился Command Center с быстрыми действиями (верификация, AI Monitor, логи) и индикатором свежести данных. Кнопка refresh инициирует мгновенную синхронизацию с сервером.
+- Панель и карточки получили стеклянный эффект, плавные тени и улучшенные шрифты. Все ключевые блоки имеют адаптивные цветовые схемы.
+- Тумблер светлой/тёмной темы запоминается в `localStorage` и синхронизируется с системным `prefers-color-scheme`. Темная тема также автоматически подкрашивает существующие Tailwind-классы (bg-white, text-gray-700 и т.д.) без переписывания десятков компонентов.
 
 ## Deployment
 
