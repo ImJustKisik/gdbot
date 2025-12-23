@@ -47,7 +47,7 @@ const EmbedBuilder: React.FC = () => {
 
     const fetchChannels = async () => {
         try {
-            const res = await api.get('/embeds/channels');
+            const res = await api.get('/channels');
             setChannels(res.data);
             if (res.data.length > 0) setSelectedChannel(res.data[0].value);
         } catch (err) {

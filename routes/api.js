@@ -1,6 +1,3 @@
-module.exports = require('./api/index');
-
-if (false) {
 const express = require('express');
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const db = require('../db');
@@ -387,27 +384,145 @@ router.get('/channels', requireAuth, async (req, res) => {
         res.json(channels);
     } catch (error) {
         console.error(error);
-        const express = require('express');
+        res.status(500).json({ error: 'Failed to fetch channels' });
+    }
+});
 
-        const router = express.Router();
+// --- Presets API ---
+router.get('/presets', requireAuth, (req, res) => {
+    try {
+        const presets = db.getPresets();
+        res.json(presets);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch presets' });
+    }
+});
 
-        const routeModules = [
-            require('./api/users.routes'),
-            require('./api/settings.routes'),
-            require('./api/monitoring.routes'),
-            require('./api/moderation.routes'),
-            require('./api/invites.routes'),
-            require('./api/stats.routes'),
-            require('./api/logs.routes'),
-            require('./api/embeds.routes'),
-            require('./api/verification.routes')
-        ];
+router.post('/presets', requireAuth, (req, res) => {
+    const { name, points } = req.body;
+    if (!name || !points) return res.status(400).json({ error: 'Missing fields' });
+    try {
+        db.addPreset(name, points);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add preset' });
+    }
+});
 
-        routeModules.forEach((moduleRouter) => {
-            router.use(moduleRouter);
-        });
+router.delete('/presets/:id', requireAuth, (req, res) => {
+    try {
+        db.deletePreset(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete preset' });
+    }
+});
 
-        module.exports = router;
+// --- Escalations API ---
+router.get('/escalations', requireAuth, (req, res) => {
+    try {
+        const rules = db.getEscalations();
+        res.json(rules);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch escalations' });
+    }
+});
+
+router.post('/escalations', requireAuth, (req, res) => {
+    const { name, threshold, action, duration } = req.body;
+    if (!threshold || !action) return res.status(400).json({ error: 'Missing fields' });
+    try {
+        db.addEscalation(name, threshold, action, duration || 0);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error adding escalation:', error);
+        res.status(500).json({ error: 'Failed to add escalation: ' + error.message });
+    }
+});
+
+router.delete('/escalations/:id', requireAuth, (req, res) => {
+    try {
+        db.deleteEscalation(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete escalation' });
+    }
+});
+
+// --- Logs API ---
+router.get('/logs', requireAuth, (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+        const type = req.query.type || null;
+        
+        const logs = db.getLogs(limit, offset, type);
+        res.json(logs);
+    } catch (error) {
+        console.error('Failed to fetch logs:', error);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
+
+// --- Stats API ---
+router.get('/stats/guilds', requireAuth, (req, res) => {
+    try {
+        const stats = db.getGuildStats();
+        res.json(stats);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch guild stats' });
+    }
+});
+
+router.get('/stats/activity', requireAuth, (req, res) => {
+    try {
+        const stats = db.getWarningStats();
+        res.json(stats);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch activity stats' });
+    }
+});
+
+router.get('/stats/ai/usage', requireAuth, (req, res) => {
+    try {
+        const days = parseInt(req.query.days, 10);
+        const summary = db.getAiUsageSummary(Number.isFinite(days) ? days : 30);
+        res.json(summary);
+    } catch (error) {
+        console.error('Failed to fetch AI usage stats:', error);
+        res.status(500).json({ error: 'Failed to fetch AI usage stats' });
+    }
+});
+
+// Get Invite Stats
+router.get('/stats/invites', requireAuth, async (req, res) => {
+    try {
+        const stats = db.getInvitesStats();
+        
+        // Enrich with usernames if possible
+        const guild = await getGuild();
+        if (guild) {
+            for (const inviter of stats.topInviters) {
+                try {
+                    const member = await fetchGuildMemberSafe(guild, inviter.inviter_id);
+                    if (member) {
+                        inviter.username = member.user.username;
+                        inviter.avatar = member.user.displayAvatarURL();
+                    } else {
+                        inviter.username = 'Unknown User';
+                    }
+                } catch (e) {
+                    inviter.username = 'Unknown User';
+                }
+            }
+        }
+        
+        res.json(stats);
+    } catch (error) {
+        console.error('Error fetching invite stats:', error);
+        res.status(500).json({ error: 'Failed to fetch invite stats' });
     }
 });
 
@@ -882,4 +997,3 @@ router.post('/verify/send-dm', requireAuth, async (req, res) => {
 
 
 module.exports = router;
-}
