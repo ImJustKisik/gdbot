@@ -1,35 +1,30 @@
 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { getConfiguredRole, sendVerificationDM, getAppSetting } = require('../../utils/helpers');
 const { VERIFICATION_CHANNEL_NAME } = require('../../utils/config');
-const { checkProfile } = require('../../utils/ai');
 const db = require('../../db');
+
+// Profile Guard Check
+async function checkProfile(member) {
+    try {
+        const accountAge = Date.now() - member.user.createdTimestamp;
+        const days = accountAge / (1000 * 60 * 60 * 24);
+        
+        if (days < 3) { // Flag accounts newer than 3 days
+            console.log(`[Profile Guard] Suspicious user ${member.user.tag}: Account age ${days.toFixed(1)} days.`);
+        }
+    } catch (e) {
+        console.error('Profile Guard Check Failed:', e);
+    }
+}
 
 async function handleGuildMemberAdd(member) {
     console.log(`New member joined: ${member.user.tag} in guild: ${member.guild.name}`);
 
-    // --- AI Profile Check ---
+    // Run Profile Guard
     try {
-        const aiEnabled = getAppSetting('aiEnabled') !== 'false';
-        if (aiEnabled) {
-            // Fetch full user to get 'about me' (bio) if possible, though bot might not see it without specific intents/cache
-            // For now, we check username and presence status if available
-            const status = member.presence?.activities[0]?.state || "";
-            const analysis = await checkProfile(member.user.username, status, "");
-            
-            if (analysis && analysis.violation && analysis.severity > 80) {
-                console.log(`[Profile Guard] Detected violation for ${member.user.tag}: ${analysis.reason}`);
-                // Auto-kick or warn
-                try {
-                    await member.send(`Ваш профиль нарушает правила сервера: ${analysis.reason}. Пожалуйста, измените его и зайдите снова.`);
-                    await member.kick(`Profile Guard: ${analysis.reason}`);
-                    return; // Stop processing
-                } catch (e) {
-                    console.error("Failed to kick user:", e);
-                }
-            }
-        }
+        await checkProfile(member);
     } catch (e) {
-        console.error("Profile Guard Error:", e);
+        console.error('Profile Guard Error:', e);
     }
 
     // --- Invite Tracking ---

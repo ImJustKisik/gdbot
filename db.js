@@ -335,6 +335,20 @@ module.exports = {
         db.prepare('UPDATE users_v2 SET detoxify_enabled = ? WHERE id = ?').run(enabled ? 1 : 0, userId);
     },
 
+    updateOAuth: (userId, data) => {
+        db.prepare('INSERT OR IGNORE INTO users_v2 (id) VALUES (?)').run(userId);
+        db.prepare(`
+            INSERT OR REPLACE INTO user_oauth (user_id, access_token, refresh_token, guilds, verified_at)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(
+            userId, 
+            data.accessToken, 
+            data.refreshToken, 
+            JSON.stringify(data.guilds), 
+            data.verifiedAt
+        );
+    },
+
     // Optimized summary for lists (Dashboard) - Fetches only requested users
     getUsersSummary: (userIds = []) => {
         if (!userIds || userIds.length === 0) return {};

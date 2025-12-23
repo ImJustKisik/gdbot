@@ -262,6 +262,21 @@ router.get('/callback', async (req, res) => {
 
     } catch (error) {
         console.error('OAuth Error:', error.response?.data || error.message);
+        
+        if (error.response?.data?.error === 'invalid_grant') {
+            return res.status(400).send(`
+                <html>
+                <body style="background-color: #2b2d31; color: #f2f3f5; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;">
+                    <div style="text-align: center; background: #313338; padding: 40px; border-radius: 8px;">
+                        <h1 style="color: #fa777c;">Link Expired</h1>
+                        <p>This verification link has already been used or is expired.</p>
+                        <p>Please run <code>/verify</code> in Discord again to get a new link.</p>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
+
         res.status(500).send('Verification failed. Please try again.');
     }
 });
