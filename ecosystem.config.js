@@ -5,8 +5,8 @@ module.exports = {
     watch: false,
     env: {
       NODE_ENV: "production",
-      SSL_KEY_PATH: "/etc/letsencrypt/live/iwasfuckedbyrkn.xyz/privkey.pem",
-      SSL_CERT_PATH: "/etc/letsencrypt/live/iwasfuckedbyrkn.xyz/fullchain.pem",
+      SSL_KEY_PATH: "./certs/privkey.pem",
+      SSL_CERT_PATH: "./certs/fullchain.pem",
     },
     // Restart if memory exceeds 1GB
     max_memory_restart: '1G',
