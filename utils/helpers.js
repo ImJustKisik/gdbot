@@ -136,11 +136,14 @@ async function generateVerificationMessage(userId) {
     const attachment = new AttachmentBuilder(buffer, { name: 'verification-qr.png' });
 
     const embed = new EmbedBuilder()
-        .setTitle('Verification Required')
-        .setDescription('Welcome! Please scan the QR code below using your **phone camera** (do NOT use the Discord app scanner) or click the link to verify.')
-        .addFields({ name: 'Verification Link', value: `[Click here to verify](${finalUrl})` })
+        .setTitle('Требуется верификация')
+        .setDescription(`Добро пожаловать! Для доступа к серверу необходимо пройти верификацию.
+
+### [👉 НАЖМИТЕ СЮДА, ЧТОБЫ ВЕРИФИЦИРОВАТЬСЯ 👈](${finalUrl})
+
+Или отсканируйте QR-код с помощью **камеры телефона** (не используйте сканер Discord).`)
         .setColor('Blue')
-        .setImage('attachment://verification-qr.png');
+        .setThumbnail('attachment://verification-qr.png');
 
     return { embeds: [embed], files: [attachment] };
 }
