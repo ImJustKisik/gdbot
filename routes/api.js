@@ -80,14 +80,18 @@ router.get('/users', requireAuth, async (req, res) => {
             if (isMuted) {
                 status = 'Muted';
             } else if (hasVerifiedRole) {
-                status = 'Verified';
+                if (localUser.hasOAuth) {
+                    status = 'Verified';
+                } else {
+                    status = 'VerifiedManual';
+                }
             } else if (hasUnverifiedRole) {
                 status = 'Unverified';
             } else {
                 // Fallback logic: if no roles match, assume Verified if they don't have the Unverified role explicitly
                 // Or keep as Unverified if you want strict checking.
                 // Let's assume if they are in the DB as verified (oauth table), they are verified.
-                if (localUser.verifiedAt) {
+                if (localUser.hasOAuth) {
                     status = 'Verified';
                 }
             }

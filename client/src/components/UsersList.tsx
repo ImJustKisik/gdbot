@@ -4,9 +4,10 @@ import { AlertTriangle, Trash2, Server, QrCode, Search, ArrowUpDown, History, Re
 import { usersApi, Guild } from '../api/users';
 import { settingsApi } from '../api/settings';
 
-const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted' | 'unverified'; label: string }[] = [
+const STATUS_FILTERS: { value: 'all' | 'verified' | 'muted' | 'unverified' | 'verified_manual'; label: string }[] = [
   { value: 'all', label: 'Все' },
-  { value: 'verified', label: 'Проверенные' },
+  { value: 'verified', label: 'Проверенные (QR)' },
+  { value: 'verified_manual', label: 'Проверенные (Вручную)' },
   { value: 'unverified', label: 'Не проверенные' },
   { value: 'muted', label: 'Замьюченные' },
 ];
@@ -38,7 +39,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const [sortConfig, setSortConfig] = useState<{ key: 'username' | 'status' | 'points'; direction: 'asc' | 'desc' } | null>(null);
   
   const [presets, setPresets] = useState<{id: number, name: string, points: number}[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'muted' | 'unverified'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'muted' | 'unverified' | 'verified_manual'>('all');
   const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,11 +78,12 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
   const stats = useMemo(() => {
     const total = users.length;
     const verified = users.filter(user => user.status === 'Verified').length;
+    const verifiedManual = users.filter(user => user.status === 'VerifiedManual').length;
     const muted = users.filter(user => user.status === 'Muted').length;
-    const unverified = Math.max(0, total - verified);
+    const unverified = Math.max(0, total - verified - verifiedManual - muted);
     const highRisk = users.filter(user => user.points >= Math.floor(maxPoints * 0.75)).length;
 
-    return { total, verified, unverified, muted, highRisk };
+    return { total, verified, verifiedManual, unverified, muted, highRisk };
   }, [users, maxPoints]);
 
   const riskMeta: Record<'low' | 'medium' | 'high', { label: string; badgeClass: string }> = {
@@ -255,6 +257,8 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
     if (statusFilter !== 'all') {
       if (statusFilter === 'verified') {
         result = result.filter(user => user.status === 'Verified');
+      } else if (statusFilter === 'verified_manual') {
+        result = result.filter(user => user.status === 'VerifiedManual');
       } else if (statusFilter === 'muted') {
         result = result.filter(user => user.status === 'Muted');
       } else if (statusFilter === 'unverified') {
@@ -342,14 +346,14 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white rounded-lg shadow-sm">
                 <Users className="text-blue-600" size={20} />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-blue-600">Всего участников</p>
+                <p className="text-xs uppercase tracking-wide text-blue-600">Всего</p>
                 <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
               </div>
             </div>
@@ -360,8 +364,19 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 <ShieldCheck className="text-green-600" size={20} />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-green-600">Проверенные</p>
+                <p className="text-xs uppercase tracking-wide text-green-600">QR Verified</p>
                 <p className="text-2xl font-bold text-green-900">{stats.verified}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <ShieldCheck className="text-indigo-600" size={20} />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-indigo-600">Manual Verif</p>
+                <p className="text-2xl font-bold text-indigo-900">{stats.verifiedManual}</p>
               </div>
             </div>
           </div>
@@ -371,7 +386,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 <AlertTriangle className="text-amber-600" size={20} />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-amber-600">Под наблюдением</p>
+                <p className="text-xs uppercase tracking-wide text-amber-600">Risk</p>
                 <p className="text-2xl font-bold text-amber-900">{stats.highRisk}</p>
               </div>
             </div>
@@ -382,7 +397,7 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 <Server className="text-gray-600" size={20} />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500">Замьючены</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Muted</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.muted}</p>
               </div>
             </div>
@@ -504,10 +519,11 @@ export const UsersList: React.FC<Props> = ({ users, refresh, loading = false }) 
                 <td className="p-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     user.status === 'Verified' ? 'bg-green-100 text-green-700' : 
+                    user.status === 'VerifiedManual' ? 'bg-blue-100 text-blue-700' :
                     user.status === 'Muted' ? 'bg-red-100 text-red-700' :
                     'bg-gray-100 text-gray-700'
                   }`}>
-                    {user.status}
+                    {user.status === 'VerifiedManual' ? 'Verified (Manual)' : user.status}
                   </span>
                 </td>
                 <td className="p-4 w-1/3">

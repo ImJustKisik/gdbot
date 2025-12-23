@@ -364,9 +364,10 @@ module.exports = {
         
         // Optimized query: Filter users first, then join warnings
         const rows = db.prepare(`
-            SELECT u.id, u.points, u.is_monitored, COUNT(w.id) AS warningsCount
+            SELECT u.id, u.points, u.is_monitored, COUNT(w.id) AS warningsCount, o.verified_at
             FROM users_v2 u
             LEFT JOIN warnings w ON w.user_id = u.id
+            LEFT JOIN user_oauth o ON o.user_id = u.id
             WHERE u.id IN (${placeholders})
             GROUP BY u.id
         `).all(...userIds);
@@ -376,7 +377,8 @@ module.exports = {
             result[row.id] = {
                 points: row.points,
                 isMonitored: !!row.is_monitored,
-                warningsCount: row.warningsCount
+                warningsCount: row.warningsCount,
+                hasOAuth: !!row.verified_at
             };
         }
 

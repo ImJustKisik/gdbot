@@ -12,7 +12,7 @@ export interface User {
   points: number;
   warningsCount: number;
   warnings?: Warning[];
-  status: 'Verified' | 'Muted' | 'Unverified';
+  status: 'Verified' | 'Muted' | 'Unverified' | 'VerifiedManual';
   invite?: {
     inviterId: string;
     code: string;
