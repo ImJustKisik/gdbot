@@ -11,7 +11,8 @@ const routeModules = [
     require('./stats.routes'),
     require('./logs.routes'),
     require('./embeds.routes'),
-    require('./verification.routes')
+    require('./verification.routes'),
+    require('./discord.routes')
 ];
 
 routeModules.forEach((moduleRouter) => {

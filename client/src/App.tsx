@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare, Cpu, RefreshCw, SunMedium, Moon, Sparkles } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Menu, LogOut, LogIn, Settings, X, List, Share2, MessageSquare, Cpu, RefreshCw, SunMedium, Moon, Sparkles, Hash as HashIcon } from 'lucide-react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { DashboardStats } from './components/DashboardStats';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -12,6 +12,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import InvitesStats from './components/InvitesStats';
 import { RecentActivity } from './components/RecentActivity';
 import { AiMonitorView } from './components/AiMonitorView';
+import { ServerPreview } from './components/ServerPreview';
 import { User } from './types';
 import { authApi } from './api/auth';
 import { usersApi } from './api/users';
@@ -276,6 +277,16 @@ function App() {
             <Cpu size={20} />
             AI Usage
           </Link>
+          <Link 
+            to="/server-preview"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`nav-pill ${
+              location.pathname === '/server-preview' ? 'bg-blue-100/70 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' : 'text-gray-600 dark:text-gray-300'
+            }`}
+          >
+            <HashIcon size={20} />
+            Server Preview
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-100/70 dark:border-white/5">
@@ -397,6 +408,7 @@ function App() {
             </>
           } />
           <Route path="/ai-monitor" element={<AiMonitorView />} />
+          <Route path="/server-preview" element={<ServerPreview />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/logs" element={<LogsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
