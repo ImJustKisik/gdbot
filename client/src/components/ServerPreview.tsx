@@ -28,6 +28,7 @@ export const ServerPreview: React.FC = () => {
   const loadGuild = async () => {
     try {
       const data = await discordApi.getGuild();
+      console.log('ServerPreview: Guild data loaded:', data);
       setGuild(data);
       // Select first text channel by default
       const firstText = data.channels.find(c => c.type === 0);

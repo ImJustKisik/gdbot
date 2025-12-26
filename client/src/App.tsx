@@ -408,7 +408,11 @@ function App() {
             </>
           } />
           <Route path="/ai-monitor" element={<AiMonitorView />} />
-          <Route path="/server-preview" element={<ServerPreview />} />
+          <Route path="/server-preview" element={
+            <ErrorBoundary>
+              <ServerPreview />
+            </ErrorBoundary>
+          } />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/logs" element={<LogsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
