@@ -22,16 +22,16 @@ function consumeVerificationState(state) {
     const entry = db.getVerificationState(state);
     
     if (!entry) {
-        return null;
+        return { userId: null, status: 'invalid' };
     }
 
     // Delete immediately to prevent reuse
     db.deleteVerificationState(state);
 
     if (entry.expires_at < Date.now()) {
-        return null;
+        return { userId: entry.user_id, status: 'expired' };
     }
-    return entry.user_id;
+    return { userId: entry.user_id, status: 'valid' };
 }
 
 module.exports = {

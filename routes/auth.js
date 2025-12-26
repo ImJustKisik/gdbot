@@ -4,10 +4,88 @@ const crypto = require('crypto');
 const { PermissionsBitField } = require('discord.js');
 const db = require('../db');
 const { consumeVerificationState } = require('../verification-state');
-const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = require('../utils/config');
-const { getGuild, fetchGuildMemberSafe, getConfiguredRole, logAction } = require('../utils/helpers');
+const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, SESSION_SECRET } = require('../utils/config');
+const { getGuild, fetchGuildMemberSafe, getConfiguredRole, logAction, sendVerificationDM } = require('../utils/helpers');
 
 const router = express.Router();
+
+const renderErrorPage = (message, showResend = false, userId = null) => {
+    let signature = '';
+    if (showResend && userId) {
+        signature = crypto.createHmac('sha256', SESSION_SECRET).update(userId).digest('hex');
+    }
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Failed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+        <div class="mb-6 flex justify-center">
+            <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center text-red-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+        </div>
+        <h1 class="text-2xl font-bold mb-2 text-white">Verification Failed</h1>
+        <p class="text-gray-400 mb-8">${message}</p>
+        
+        ${showResend ? `
+        <form action="/api/auth/resend" method="POST">
+            <input type="hidden" name="userId" value="${userId}">
+            <input type="hidden" name="signature" value="${signature}">
+            <button type="submit" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                Resend Verification Link
+            </button>
+        </form>
+        ` : ''}
+        
+        <div class="mt-6">
+            <a href="/" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Return to Home</a>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+};
+
+const renderSuccessPage = (message) => {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Success</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+        <div class="mb-6 flex justify-center">
+            <div class="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+        </div>
+        <h1 class="text-2xl font-bold mb-2 text-white">Success</h1>
+        <p class="text-gray-400 mb-8">${message}</p>
+    </div>
+</body>
+</html>
+    `;
+};
 
 // Auth: Login URL
 router.get('/login', (req, res) => {
@@ -124,10 +202,14 @@ router.get('/callback', async (req, res) => {
         }
 
         // --- VERIFICATION FLOW (Existing) ---
-        const userId = consumeVerificationState(state);
-        if (!userId) {
-            console.error('Verification failed: invalid or expired state token');
-            return res.status(400).send('<h1>Verification Failed</h1><p>Your verification link expired or is invalid. Please request a new QR code.</p>');
+        const { userId, status } = consumeVerificationState(state);
+        
+        if (status !== 'valid') {
+            console.error(`Verification failed: ${status} state token`);
+            if (status === 'expired' && userId) {
+                return res.status(400).send(renderErrorPage('Your verification link has expired.', true, userId));
+            }
+            return res.status(400).send(renderErrorPage('Your verification link is invalid or has already been used. Please request a new QR code.'));
         }
 
         // Fetch User Guilds
@@ -278,6 +360,39 @@ router.get('/callback', async (req, res) => {
         }
 
         res.status(500).send('Verification failed. Please try again.');
+    }
+});
+
+router.post('/resend', async (req, res) => {
+    const { userId, signature } = req.body;
+    
+    if (!userId || !signature) {
+        return res.status(400).send(renderErrorPage('Invalid request.'));
+    }
+
+    // Verify signature
+    const expectedSignature = crypto.createHmac('sha256', SESSION_SECRET).update(userId).digest('hex');
+    if (signature !== expectedSignature) {
+        return res.status(403).send(renderErrorPage('Invalid signature.'));
+    }
+
+    try {
+        const guild = await getGuild();
+        const member = await fetchGuildMemberSafe(guild, userId);
+        
+        if (!member) {
+            return res.status(404).send(renderErrorPage('User not found on the server.'));
+        }
+
+        const sent = await sendVerificationDM(member);
+        if (sent) {
+            return res.send(renderSuccessPage('A new verification link has been sent to your Direct Messages.'));
+        } else {
+            return res.status(500).send(renderErrorPage('Failed to send DM. Please check your privacy settings.'));
+        }
+    } catch (error) {
+        console.error('Resend failed:', error);
+        return res.status(500).send(renderErrorPage('An error occurred while processing your request.'));
     }
 });
 
