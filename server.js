@@ -23,7 +23,7 @@ const SQLiteStore = require('./session-store');
 const { startBot, client } = require('./bot'); // Imports from bot/index.js
 const database = require('./db');
 const authRoutes = require('./routes/auth');
-const apiRoutes = require('./routes/api');
+const apiRoutes = require('./routes/api/index');
 const { getGuild, logAction } = require('./utils/helpers');
 
 const app = express();
