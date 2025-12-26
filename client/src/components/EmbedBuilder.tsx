@@ -126,20 +126,20 @@ const EmbedBuilder: React.FC = () => {
 
     return (
         <div className="p-6 max-w-6xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6 text-white">Embed Builder</h1>
+            <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Embed Builder</h1>
 
             {/* Mode Switcher */}
-            <div className="mb-6 bg-gray-800 p-4 rounded-lg">
+            <div className="mb-6 glass-panel p-4">
                 <div className="flex gap-4 mb-4">
                     <button 
                         onClick={() => setEditMode(false)}
-                        className={`px-4 py-2 rounded ${!editMode ? 'bg-blue-600' : 'bg-gray-700'}`}
+                        className={`px-4 py-2 rounded transition-colors ${!editMode ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                     >
                         New Message
                     </button>
                     <button 
                         onClick={() => setEditMode(true)}
-                        className={`px-4 py-2 rounded ${editMode ? 'bg-blue-600' : 'bg-gray-700'}`}
+                        className={`px-4 py-2 rounded transition-colors ${editMode ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                     >
                         Edit Existing
                     </button>
@@ -148,37 +148,37 @@ const EmbedBuilder: React.FC = () => {
                 {editMode ? (
                     <div className="flex gap-4 items-end">
                         <div className="flex-1">
-                            <label className="block text-sm text-gray-400 mb-1">Channel ID</label>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Channel ID</label>
                             <input 
                                 type="text" 
                                 value={editChannelId}
                                 onChange={e => setEditChannelId(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+                                className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                 placeholder="Channel ID"
                             />
                         </div>
                         <div className="flex-1">
-                            <label className="block text-sm text-gray-400 mb-1">Message ID</label>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Message ID</label>
                             <input 
                                 type="text" 
                                 value={editMessageId}
                                 onChange={e => setEditMessageId(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+                                className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                 placeholder="Message ID"
                             />
                         </div>
-                        <button onClick={loadMessage} className="bg-green-600 px-4 py-2 rounded h-10">Load</button>
+                        <button onClick={loadMessage} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded h-10 transition-colors">Load</button>
                     </div>
                 ) : (
                     <div>
                         <div className="flex justify-between items-center mb-1">
-                            <label className="block text-sm text-gray-400">Select Channel</label>
-                            <button onClick={fetchChannels} className="text-xs text-blue-400 hover:text-blue-300">Refresh List</button>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400">Select Channel</label>
+                            <button onClick={fetchChannels} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Refresh List</button>
                         </div>
                         <select 
                             value={selectedChannel}
                             onChange={e => setSelectedChannel(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             {channels.length === 0 && <option>Loading or no channels...</option>}
                             {channels.map(c => (
@@ -195,109 +195,117 @@ const EmbedBuilder: React.FC = () => {
                 {/* Editor Column */}
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm text-gray-400 mb-1">Message Content (Outside Embed)</label>
+                        <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Message Content (Outside Embed)</label>
                         <textarea 
                             value={messageContent}
                             onChange={e => setMessageContent(e.target.value)}
-                            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white h-20"
+                            className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white h-20 focus:ring-2 focus:ring-blue-500 outline-none"
                             placeholder="Text above the embed..."
                         />
                     </div>
 
-                    <div className="bg-gray-800 p-4 rounded-lg space-y-4 border-l-4" style={{ borderColor: embed.color }}>
-                        <h3 className="text-lg font-semibold text-gray-300">Embed Settings</h3>
+                    <div className="glass-panel p-4 space-y-4 border-l-4" style={{ borderColor: embed.color }}>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Embed Settings</h3>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-gray-400">Author Name</label>
+                                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Author Name</label>
                                 <input 
                                     type="text" 
                                     value={embed.author?.name || ''}
                                     onChange={e => setEmbed({...embed, author: { ...embed.author, name: e.target.value }})}
-                                    className="w-full bg-gray-700 rounded px-2 py-1"
+                                    className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400">Color (Hex)</label>
-                                <input 
-                                    type="color" 
-                                    value={embed.color}
-                                    onChange={e => setEmbed({...embed, color: e.target.value})}
-                                    className="w-full h-8 bg-gray-700 rounded cursor-pointer"
-                                />
+                                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Color (Hex)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="color" 
+                                        value={embed.color}
+                                        onChange={e => setEmbed({...embed, color: e.target.value})}
+                                        className="h-8 w-12 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        value={embed.color}
+                                        onChange={e => setEmbed({...embed, color: e.target.value})}
+                                        className="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white uppercase text-sm font-mono focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400">Title</label>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Title</label>
                             <input 
                                 type="text" 
                                 value={embed.title}
                                 onChange={e => setEmbed({...embed, title: e.target.value})}
-                                className="w-full bg-gray-700 rounded px-2 py-1 font-bold"
+                                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 font-bold text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400">Description</label>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Description</label>
                             <textarea 
                                 value={embed.description}
                                 onChange={e => setEmbed({...embed, description: e.target.value})}
-                                className="w-full bg-gray-700 rounded px-2 py-1 h-32"
+                                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 h-32 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                             />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-gray-400">Image URL</label>
+                                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Image URL</label>
                                 <input 
                                     type="text" 
                                     value={embed.image || ''}
                                     onChange={e => setEmbed({...embed, image: e.target.value})}
-                                    className="w-full bg-gray-700 rounded px-2 py-1"
+                                    className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400">Thumbnail URL</label>
+                                <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Thumbnail URL</label>
                                 <input 
                                     type="text" 
                                     value={embed.thumbnail || ''}
                                     onChange={e => setEmbed({...embed, thumbnail: e.target.value})}
-                                    className="w-full bg-gray-700 rounded px-2 py-1"
+                                    className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400">Footer Text</label>
+                            <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Footer Text</label>
                             <input 
                                 type="text" 
                                 value={embed.footer?.text || ''}
                                 onChange={e => setEmbed({...embed, footer: { ...embed.footer, text: e.target.value }})}
-                                className="w-full bg-gray-700 rounded px-2 py-1"
+                                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                             />
                         </div>
 
                         {/* Fields */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <label className="text-sm text-gray-400">Fields</label>
-                                <button onClick={addField} className="text-xs bg-blue-600 px-2 py-1 rounded">+ Add Field</button>
+                                <label className="text-sm text-gray-500 dark:text-gray-400">Fields</label>
+                                <button onClick={addField} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">+ Add Field</button>
                             </div>
                             {embed.fields.map((field, idx) => (
-                                <div key={idx} className="bg-gray-700 p-2 rounded flex gap-2 items-start">
+                                <div key={idx} className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 p-2 rounded flex gap-2 items-start">
                                     <div className="flex-1 space-y-2">
                                         <input 
                                             type="text" 
                                             value={field.name} 
                                             onChange={e => handleFieldChange(idx, 'name', e.target.value)}
-                                            className="w-full bg-gray-600 px-2 py-1 rounded text-sm"
+                                            className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 px-2 py-1 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                             placeholder="Field Name"
                                         />
                                         <textarea 
                                             value={field.value} 
                                             onChange={e => handleFieldChange(idx, 'value', e.target.value)}
-                                            className="w-full bg-gray-600 px-2 py-1 rounded text-sm"
+                                            className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 px-2 py-1 rounded text-sm text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                             placeholder="Field Value"
                                         />
                                         <label className="flex items-center gap-2 text-xs text-gray-400">

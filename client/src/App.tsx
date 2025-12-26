@@ -168,7 +168,7 @@ function App() {
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden" 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 md:hidden" 
           onClick={() => setIsMobileMenuOpen(false)} 
         />
       )}
@@ -380,7 +380,7 @@ function App() {
               </ErrorBoundary>
 
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Member Management</h3>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Member Management</h3>
                 <UsersList users={users} refresh={fetchUsers} />
               </div>
             </>
@@ -390,8 +390,8 @@ function App() {
           <Route path="/invites" element={
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-800">Invite Tracking</h2>
-                <p className="text-gray-500">Monitor server invites and join statistics</p>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Invite Tracking</h2>
+                <p className="text-gray-500 dark:text-gray-400">Monitor server invites and join statistics</p>
               </div>
               <InvitesStats />
             </>

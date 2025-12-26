@@ -87,7 +87,7 @@ export const AiMonitorView = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 text-gray-500">
+      <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
         <RefreshCcw className="animate-spin" size={20} />
         Загрузка AI-статистики...
       </div>
@@ -96,7 +96,7 @@ export const AiMonitorView = () => {
 
   if (error) {
     return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-red-700">
+      <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/20">
         {error}
         <button className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg" onClick={loadData}>
           Повторить попытку
@@ -113,29 +113,29 @@ export const AiMonitorView = () => {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Cpu size={24} className="text-blue-600" /> AI Usage & Monitor
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            <Cpu size={24} className="text-blue-600 dark:text-blue-400" /> AI Usage & Monitor
           </h2>
-          <p className="text-gray-500">Обзор нагрузки и контроль отслеживаемых пользователей/каналов</p>
+          <p className="text-gray-500 dark:text-gray-400">Обзор нагрузки и контроль отслеживаемых пользователей/каналов</p>
         </div>
-        <div className="text-sm text-gray-500">Последние {usage.rangeDays} дней</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">Последние {usage.rangeDays} дней</div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Запросы" value={formatNumber(usage.totals.requests)} icon={<Activity size={18} className="text-indigo-600" />} />
-        <StatCard label="Tokens (Prompt)" value={formatNumber(usage.totals.promptTokens)} icon={<Shield size={18} className="text-emerald-600" />} />
-        <StatCard label="Tokens (Completion)" value={formatNumber(usage.totals.completionTokens)} icon={<Shield size={18} className="text-teal-600" />} />
-        <StatCard label="Cost" value={formatCurrency(usage.totals.cost)} icon={<Bell size={18} className="text-amber-600" />} />
+        <StatCard label="Запросы" value={formatNumber(usage.totals.requests)} icon={<Activity size={18} className="text-indigo-600 dark:text-indigo-400" />} />
+        <StatCard label="Tokens (Prompt)" value={formatNumber(usage.totals.promptTokens)} icon={<Shield size={18} className="text-emerald-600 dark:text-emerald-400" />} />
+        <StatCard label="Tokens (Completion)" value={formatNumber(usage.totals.completionTokens)} icon={<Shield size={18} className="text-teal-600 dark:text-teal-400" />} />
+        <StatCard label="Cost" value={formatCurrency(usage.totals.cost)} icon={<Bell size={18} className="text-amber-600 dark:text-amber-400" />} />
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="glass-panel p-6">
         <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 bg-blue-50 rounded-lg">
-            <Activity className="text-blue-600" size={18} />
+          <div className="p-2 bg-blue-50 dark:bg-blue-500/20 rounded-lg">
+            <Activity className="text-blue-600 dark:text-blue-400" size={18} />
           </div>
           <div>
-            <h3 className="font-semibold">Ежедневное использование</h3>
-            <p className="text-sm text-gray-500">Количество AI-вызовов и стоимость по дням</p>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Ежедневное использование</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Количество AI-вызовов и стоимость по дням</p>
           </div>
         </div>
         <div className="h-[280px]">
@@ -148,10 +148,13 @@ export const AiMonitorView = () => {
                     <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" tickFormatter={(val) => (typeof val === 'string' ? val.substring(5) : val)} />
-                <YAxis allowDecimals={false} />
-                <Tooltip contentStyle={{ borderRadius: 12 }} formatter={(value: number) => formatNumber(value)} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156, 163, 175, 0.2)" />
+                <XAxis dataKey="day" tickFormatter={(val) => (typeof val === 'string' ? val.substring(5) : val)} stroke="#9CA3AF" />
+                <YAxis allowDecimals={false} stroke="#9CA3AF" />
+                <Tooltip 
+                  contentStyle={{ borderRadius: 12, backgroundColor: 'rgba(17, 24, 39, 0.9)', border: 'none', color: '#fff' }} 
+                  formatter={(value: number) => formatNumber(value)} 
+                />
                 <Area type="monotone" dataKey="requests" stroke="#4F46E5" fillOpacity={1} fill="url(#aiDaily)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -210,9 +213,9 @@ export const AiMonitorView = () => {
         />
       </div>
 
-      <div className="bg-white p-6 rounded-xl border border-gray-100">
-        <h3 className="font-semibold mb-2">Быстрый обзор настроек</h3>
-        <p className="text-sm text-gray-500 mb-4">Подробная настройка доступна во вкладке Settings → AI Monitoring.</p>
+      <div className="glass-panel p-6">
+        <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Быстрый обзор настроек</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Подробная настройка доступна во вкладке Settings → AI Monitoring.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <QuickSetting label="AI Enabled" value={snapshot.settings.aiEnabled ? 'On' : 'Off'} />
           <QuickSetting label="Threshold" value={`${snapshot.settings.aiThreshold}%`} />
@@ -230,11 +233,11 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, value, icon }: StatCardProps) => (
-  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-    <div className="p-3 bg-gray-50 rounded-lg">{icon}</div>
+  <div className="glass-panel p-4 flex items-center gap-4">
+    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">{icon}</div>
     <div>
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-xl font-semibold text-gray-800">{value}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="text-xl font-semibold text-gray-800 dark:text-white">{value}</p>
     </div>
   </div>
 );
@@ -246,16 +249,16 @@ interface ListCardProps {
 }
 
 const ListCard = ({ title, emptyText, items }: ListCardProps) => (
-  <div className="bg-white p-6 rounded-xl border border-gray-100">
-    <h3 className="font-semibold mb-4">{title}</h3>
+  <div className="glass-panel p-6">
+    <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">{title}</h3>
     {items.length === 0 ? (
       <p className="text-gray-400 text-sm">{emptyText}</p>
     ) : (
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.label} className="flex justify-between text-sm">
-            <span className="text-gray-700">{item.label}</span>
-            <span className="font-semibold text-gray-900">{item.value}</span>
+            <span className="text-gray-700 dark:text-gray-300">{item.label}</span>
+            <span className="font-semibold text-gray-900 dark:text-white">{item.value}</span>
           </li>
         ))}
       </ul>
@@ -290,10 +293,10 @@ const MonitoringPanel = ({
   onTogglePing,
   onDisable,
 }: MonitoringPanelProps) => (
-  <div className="bg-white p-6 rounded-xl border border-gray-100">
+  <div className="glass-panel p-6">
     <div className="mb-4">
-      <h3 className="font-semibold text-gray-800">{title}</h3>
-      <p className="text-sm text-gray-500">{description}</p>
+      <h3 className="font-semibold text-gray-800 dark:text-white">{title}</h3>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
     </div>
 
     {entries.length === 0 ? (
@@ -301,15 +304,15 @@ const MonitoringPanel = ({
     ) : (
       <ul className="space-y-4">
         {entries.map((entry) => (
-          <li key={entry.id} className="flex flex-col gap-3 border border-gray-100 rounded-lg p-4">
+          <li key={entry.id} className="flex flex-col gap-3 border border-gray-100 dark:border-white/10 rounded-lg p-4 bg-gray-50 dark:bg-white/5">
             <div className="flex items-center gap-3">
               {entry.avatar ? (
                 <img src={entry.avatar} alt={entry.username} className="w-10 h-10 rounded-full" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">#</div>
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-500 dark:text-gray-400">#</div>
               )}
               <div>
-                <p className="font-medium text-gray-800">{entry.username}</p>
+                <p className="font-medium text-gray-800 dark:text-white">{entry.username}</p>
                 <p className="text-xs text-gray-400">ID: {entry.id}</p>
               </div>
             </div>
@@ -328,7 +331,7 @@ const MonitoringPanel = ({
               />
               <button
                 onClick={() => onDisable(entry.id)}
-                className="px-3 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10"
               >
                 Disable
               </button>
@@ -353,8 +356,8 @@ const ToggleButton = ({ label, enabled, onClick, loadingKey }: ToggleButtonProps
     disabled={loadingKey}
     className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
       enabled
-        ? 'bg-green-50 text-green-700 border-green-200'
-        : 'bg-gray-50 text-gray-500 border-gray-200'
+        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-500/30'
+        : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-white/5 dark:text-gray-400 dark:border-white/10'
     } ${loadingKey ? 'opacity-60 cursor-wait' : ''}`}
   >
     {enabled ? 'On' : 'Off'} {label}
@@ -362,8 +365,8 @@ const ToggleButton = ({ label, enabled, onClick, loadingKey }: ToggleButtonProps
 );
 
 const QuickSetting = ({ label, value }: { label: string; value: string }) => (
-  <div className="p-4 bg-gray-50 rounded-lg">
-    <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-    <p className="text-lg font-semibold text-gray-800">{value}</p>
+  <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-lg">
+    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
+    <p className="text-lg font-semibold text-gray-800 dark:text-white">{value}</p>
   </div>
 );

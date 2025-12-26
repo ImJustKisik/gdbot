@@ -72,27 +72,27 @@ const InvitesStats: React.FC = () => {
     setInviteJoins([]);
   };
 
-  if (loading) return <div className="animate-pulse h-48 bg-gray-800 rounded-lg"></div>;
+  if (loading) return <div className="animate-pulse h-48 bg-gray-800/50 rounded-lg"></div>;
   if (!stats) return null;
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Total Invites Card */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+        <div className="glass-panel p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-200">Total Tracked Invites</h3>
-            <Users className="w-6 h-6 text-blue-400" />
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Total Tracked Invites</h3>
+            <Users className="w-6 h-6 text-blue-500 dark:text-blue-400" />
           </div>
-          <div className="text-4xl font-bold text-white">{stats.totalInvites}</div>
-          <p className="text-sm text-gray-400 mt-2">Users joined via tracked invites</p>
+          <div className="text-4xl font-bold text-gray-900 dark:text-white">{stats.totalInvites}</div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Users joined via tracked invites</p>
         </div>
 
         {/* Top Inviters Card */}
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+        <div className="glass-panel p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-200">Top Inviters</h3>
-            <Trophy className="w-6 h-6 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Top Inviters</h3>
+            <Trophy className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
           </div>
           <div className="space-y-4">
             {stats.topInviters.length === 0 ? (
@@ -101,19 +101,19 @@ const InvitesStats: React.FC = () => {
               stats.topInviters.map((inviter, index) => (
                 <div key={inviter.inviter_id} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full font-bold text-gray-300">
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-full font-bold text-gray-500 dark:text-gray-300">
                       {index + 1}
                     </div>
                     {inviter.avatar ? (
                       <img src={inviter.avatar} alt={inviter.username} className="w-8 h-8 rounded-full" />
                     ) : (
-                      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
-                        <span className="text-xs">{inviter.username?.substring(0, 2).toUpperCase()}</span>
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs text-gray-600 dark:text-gray-300">{inviter.username?.substring(0, 2).toUpperCase()}</span>
                       </div>
                     )}
-                    <span className="text-gray-200 font-medium">{inviter.username}</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">{inviter.username}</span>
                   </div>
-                  <span className="text-blue-400 font-bold">{inviter.count} invites</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">{inviter.count} invites</span>
                 </div>
               ))
             )}
@@ -122,16 +122,16 @@ const InvitesStats: React.FC = () => {
       </div>
 
       {/* Active Invites List */}
-      <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
-        <div className="p-6 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
-            <LinkIcon className="w-5 h-5 text-green-400" />
+      <div className="glass-panel overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+            <LinkIcon className="w-5 h-5 text-green-500 dark:text-green-400" />
             Active Invites Management
           </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-900/50 text-gray-400 text-sm uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-sm uppercase">
               <tr>
                 <th className="px-6 py-3">Code</th>
                 <th className="px-6 py-3">Alias</th>
@@ -140,10 +140,10 @@ const InvitesStats: React.FC = () => {
                 <th className="px-6 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {invites.map((invite) => (
-                <tr key={invite.code} className="hover:bg-gray-700/50 transition-colors">
-                  <td className="px-6 py-4 font-mono text-blue-400">
+                <tr key={invite.code} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                  <td className="px-6 py-4 font-mono text-blue-600 dark:text-blue-400">
                     <a href={invite.url} target="_blank" rel="noreferrer" className="hover:underline">
                       {invite.code}
                     </a>
@@ -155,21 +155,21 @@ const InvitesStats: React.FC = () => {
                           type="text"
                           value={tempAlias}
                           onChange={(e) => setTempAlias(e.target.value)}
-                          className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-500"
+                          className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
                           placeholder="Enter alias..."
                           autoFocus
                         />
                       </div>
                     ) : (
-                      <span className={invite.alias ? "text-white" : "text-gray-500 italic"}>
+                      <span className={invite.alias ? "text-gray-900 dark:text-white" : "text-gray-400 italic"}>
                         {invite.alias || "No alias"}
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-gray-300">
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
                     <button 
                       onClick={() => handleViewJoins(invite)}
-                      className="hover:text-blue-400 hover:underline flex items-center gap-1"
+                      className="hover:text-blue-500 dark:hover:text-blue-400 hover:underline flex items-center gap-1"
                       disabled={invite.uses === 0}
                     >
                       {invite.uses}
@@ -180,10 +180,10 @@ const InvitesStats: React.FC = () => {
                     {invite.inviter ? (
                       <div className="flex items-center gap-2">
                         <img src={invite.inviter.avatar} alt="" className="w-6 h-6 rounded-full" />
-                        <span className="text-sm text-gray-300">{invite.inviter.username}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{invite.inviter.username}</span>
                       </div>
                     ) : (
-                      <span className="text-gray-500 text-sm">Unknown</span>
+                      <span className="text-gray-400 text-sm">Unknown</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -191,13 +191,13 @@ const InvitesStats: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleSaveAlias(invite.code)}
-                          className="p-1 text-green-400 hover:bg-green-400/10 rounded"
+                          className="p-1 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-400/10 rounded"
                         >
                           <Check size={16} />
                         </button>
                         <button
                           onClick={() => setEditingAlias(null)}
-                          className="p-1 text-red-400 hover:bg-red-400/10 rounded"
+                          className="p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-400/10 rounded"
                         >
                           <X size={16} />
                         </button>

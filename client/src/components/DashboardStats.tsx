@@ -63,43 +63,46 @@ export const DashboardStats: React.FC<Props> = ({ users }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-        <div className="p-3 bg-blue-50 rounded-lg mr-4">
-          <Users className="text-blue-600 w-6 h-6" />
+      <div className="glass-panel p-6 flex items-center">
+        <div className="p-3 bg-blue-500/10 rounded-lg mr-4">
+          <Users className="text-blue-600 dark:text-blue-400 w-6 h-6" />
         </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Total Users</p>
-          <p className="text-2xl font-bold text-gray-900">{totalUsers}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Users</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalUsers}</p>
         </div>
       </div>
       
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-        <div className="p-3 bg-red-50 rounded-lg mr-4">
-          <MicOff className="text-red-600 w-6 h-6" />
+      <div className="glass-panel p-6 flex items-center">
+        <div className="p-3 bg-red-500/10 rounded-lg mr-4">
+          <MicOff className="text-red-600 dark:text-red-400 w-6 h-6" />
         </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Muted Users</p>
-          <p className="text-2xl font-bold text-gray-900">{mutedUsers}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Muted Users</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{mutedUsers}</p>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
-        <div className="p-3 bg-orange-50 rounded-lg mr-4">
-          <ShieldAlert className="text-orange-600 w-6 h-6" />
+      <div className="glass-panel p-6 flex items-center">
+        <div className="p-3 bg-orange-500/10 rounded-lg mr-4">
+          <ShieldAlert className="text-orange-600 dark:text-orange-400 w-6 h-6" />
         </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Total Warnings</p>
-          <p className="text-2xl font-bold text-gray-900">{totalWarns}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Warnings</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalWarns}</p>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 col-span-1 md:col-span-3 h-64">
-         <h3 className="text-lg font-semibold mb-4 text-gray-800">Weekly Activity (Current Week)</h3>
+      <div className="glass-panel p-4 col-span-1 md:col-span-3 h-64">
+         <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Weekly Activity (Current Week)</h3>
          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weeklyData}>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} />
-              <Tooltip cursor={{fill: '#f3f4f6'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-              <Bar dataKey="warns" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} stroke="#94a3b8" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
+              />
+              <Bar dataKey="warns" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
          </ResponsiveContainer>
       </div>

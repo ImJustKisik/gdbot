@@ -46,19 +46,19 @@ export const AnalyticsView: React.FC = () => {
         fetchData();
     }, []);
 
-    if (loading) return <div className="p-4 text-gray-500">Loading analytics...</div>;
+    if (loading) return <div className="p-4 text-gray-500 dark:text-gray-400">Loading analytics...</div>;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Top Servers Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="glass-panel p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                        <BarChart3 className="text-blue-600" size={20} />
+                    <div className="p-2 bg-blue-50 dark:bg-blue-500/20 rounded-lg">
+                        <BarChart3 className="text-blue-600 dark:text-blue-400" size={20} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-800">Top User Communities</h3>
-                        <p className="text-sm text-gray-500">Where your verified users come from</p>
+                        <h3 className="font-bold text-gray-800 dark:text-white">Top User Communities</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Where your verified users come from</p>
                     </div>
                 </div>
 
@@ -66,18 +66,18 @@ export const AnalyticsView: React.FC = () => {
                     {guildStats.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={guildStats} layout="vertical" margin={{ left: 20, right: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="rgba(156, 163, 175, 0.2)" />
                                 <XAxis type="number" hide />
                                 <YAxis 
                                     dataKey="name" 
                                     type="category" 
                                     width={120} 
-                                    tick={{fontSize: 11}} 
+                                    tick={{fontSize: 11, fill: '#9CA3AF'}} 
                                     tickFormatter={(val) => val && typeof val === 'string' ? (val.length > 15 ? val.substring(0, 15) + '...' : val) : ''}
                                 />
                                 <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    cursor={{fill: '#f3f4f6'}}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'rgba(17, 24, 39, 0.9)', color: '#fff' }}
+                                    cursor={{fill: 'rgba(243, 244, 246, 0.1)'}}
                                 />
                                 <Bar dataKey="count" fill="#4F46E5" radius={[0, 4, 4, 0]} barSize={20} />
                             </BarChart>
@@ -92,14 +92,14 @@ export const AnalyticsView: React.FC = () => {
             </div>
 
             {/* Activity Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="glass-panel p-6">
                 <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-orange-50 rounded-lg">
-                        <TrendingUp className="text-orange-600" size={20} />
+                    <div className="p-2 bg-orange-50 dark:bg-orange-500/20 rounded-lg">
+                        <TrendingUp className="text-orange-600 dark:text-orange-400" size={20} />
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-800">Moderation Activity</h3>
-                        <p className="text-sm text-gray-500">Warnings issued over time</p>
+                        <h3 className="font-bold text-gray-800 dark:text-white">Moderation Activity</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Warnings issued over time</p>
                     </div>
                 </div>
 
@@ -113,15 +113,15 @@ export const AnalyticsView: React.FC = () => {
                                         <stop offset="95%" stopColor="#F97316" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(156, 163, 175, 0.2)" />
                                 <XAxis 
                                     dataKey="day" 
-                                    tick={{fontSize: 12}} 
+                                    tick={{fontSize: 12, fill: '#9CA3AF'}} 
                                     tickFormatter={(val) => val && typeof val === 'string' ? val.substring(5) : ''} // Show MM-DD
                                 />
-                                <YAxis allowDecimals={false} />
+                                <YAxis allowDecimals={false} stroke="#9CA3AF" />
                                 <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: 'rgba(17, 24, 39, 0.9)', color: '#fff' }}
                                 />
                                 <Area type="monotone" dataKey="count" stroke="#F97316" fillOpacity={1} fill="url(#colorCount)" />
                             </AreaChart>

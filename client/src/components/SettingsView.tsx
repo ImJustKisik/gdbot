@@ -167,12 +167,12 @@ export const SettingsView: React.FC = () => {
         return (
             <div className="space-y-4">
                 {[0, 1, 2].map(index => (
-                    <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-pulse">
-                        <div className="h-4 bg-gray-200 rounded w-1/3 mb-6" />
+                    <div key={index} className="glass-panel p-6 animate-pulse">
+                        <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-1/3 mb-6" />
                         <div className="space-y-3">
-                            <div className="h-3 bg-gray-100 rounded" />
-                            <div className="h-3 bg-gray-100 rounded w-5/6" />
-                            <div className="h-3 bg-gray-100 rounded w-2/3" />
+                            <div className="h-3 bg-gray-100 dark:bg-white/5 rounded" />
+                            <div className="h-3 bg-gray-100 dark:bg-white/5 rounded w-5/6" />
+                            <div className="h-3 bg-gray-100 dark:bg-white/5 rounded w-2/3" />
                         </div>
                     </div>
                 ))}
@@ -183,12 +183,12 @@ export const SettingsView: React.FC = () => {
     return (
         <div className="space-y-6 max-w-4xl mx-auto">
             {feedback && (
-                <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'} transition-all`}>
+                <div className={`p-3 rounded-lg ${feedback.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/20' : 'bg-green-50 text-green-700 border border-green-100 dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20'} transition-all`}>
                     {feedback.message}
                 </div>
             )}
             {loadError && (
-                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/20 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <span>{loadError}</span>
                     <button
                         onClick={() => { setLoading(true); fetchData(); }}
@@ -200,13 +200,13 @@ export const SettingsView: React.FC = () => {
             )}
 
             {/* Tabs Navigation */}
-            <div className="flex space-x-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex space-x-1 glass-panel p-1">
                 <button
                     onClick={() => setActiveTab('general')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'general' 
-                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/20 dark:text-blue-300' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                 >
                     <SettingsIcon size={18} />
@@ -216,8 +216,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setActiveTab('automod')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'automod' 
-                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/20 dark:text-blue-300' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                 >
                     <Shield size={18} />
@@ -227,8 +227,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setActiveTab('presets')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'presets' 
-                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/20 dark:text-blue-300' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                 >
                     <List size={18} />
@@ -238,8 +238,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setActiveTab('ai')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'ai' 
-                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/20 dark:text-blue-300' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                 >
                     <Brain size={18} />
@@ -249,8 +249,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setActiveTab('appeals')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'appeals' 
-                            ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/20 dark:text-blue-300' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                 >
                     <List size={18} />
@@ -260,13 +260,13 @@ export const SettingsView: React.FC = () => {
             
             {/* General Settings */}
             {activeTab === 'general' && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <h2 className="text-xl font-bold mb-6 text-gray-800">General Configuration</h2>
+                <div className="glass-panel p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">General Configuration</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Log Channel</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Log Channel</label>
                             <select 
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.logChannelId || ''}
                                 onChange={e => setSettings({...settings, logChannelId: e.target.value})}
                             >
@@ -275,12 +275,12 @@ export const SettingsView: React.FC = () => {
                                     <option key={channel.value} value={channel.value}>#{channel.label}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Current: {getChannelDisplay(settings.logChannelId)}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mod Log Channel</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mod Log Channel</label>
                             <select 
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.modLogChannelId || ''}
                                 onChange={e => setSettings({...settings, modLogChannelId: e.target.value})}
                             >
@@ -289,12 +289,12 @@ export const SettingsView: React.FC = () => {
                                     <option key={`${channel.value}-mod`} value={channel.value}>#{channel.label}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.modLogChannelId)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Current: {getChannelDisplay(settings.modLogChannelId)}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Verification Channel</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Verification Channel</label>
                             <select 
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.verificationChannelId || ''}
                                 onChange={e => setSettings({...settings, verificationChannelId: e.target.value})}
                             >
@@ -303,12 +303,12 @@ export const SettingsView: React.FC = () => {
                                     <option key={`${channel.value}-verify`} value={channel.value}>#{channel.label}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Current: {getChannelDisplay(settings.verificationChannelId)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Current: {getChannelDisplay(settings.verificationChannelId)}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Unverified Role</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unverified Role</label>
                             <select 
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.roleUnverified || ''}
                                 onChange={e => setSettings({...settings, roleUnverified: e.target.value})}
                             >
@@ -317,12 +317,12 @@ export const SettingsView: React.FC = () => {
                                     <option key={`${role.value}-unverified`} value={role.value}>{role.label}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleUnverified)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Current: {getRoleDisplay(settings.roleUnverified)}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Verified Role</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Verified Role</label>
                             <select 
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.roleVerified || ''}
                                 onChange={e => setSettings({...settings, roleVerified: e.target.value})}
                             >
@@ -331,10 +331,10 @@ export const SettingsView: React.FC = () => {
                                     <option key={`${role.value}-verified`} value={role.value}>{role.label}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Current: {getRoleDisplay(settings.roleVerified)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Current: {getRoleDisplay(settings.roleVerified)}</p>
                         </div>
                     </div>
-                    <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                    <div className="mt-8 pt-6 border-t border-gray-100 dark:border-white/5 flex justify-end">
                         <button 
                             onClick={handleSaveSettings}
                             disabled={saving}
@@ -351,28 +351,28 @@ export const SettingsView: React.FC = () => {
             {activeTab === 'automod' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     {/* Default Auto-Mute Settings */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h2 className="text-xl font-bold mb-2 text-gray-800">Default Auto-Mute</h2>
-                        <p className="text-sm text-gray-500 mb-6">Fallback rules when no specific escalation matches. Set threshold to 0 to disable.</p>
+                    <div className="glass-panel p-6">
+                        <h2 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">Default Auto-Mute</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Fallback rules when no specific escalation matches. Set threshold to 0 to disable.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Threshold (Points)</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Threshold (Points)</label>
                                 <input 
                                     type="number"
                                     min={0}
                                     max={200}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                     value={settings.autoMuteThreshold}
                                     onChange={e => setSettings(prev => ({ ...prev, autoMuteThreshold: Math.max(0, Number(e.target.value)) }))}
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (Minutes)</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (Minutes)</label>
                                 <input 
                                     type="number"
                                     min={1}
                                     max={10080}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                     value={settings.autoMuteDuration}
                                     onChange={e => setSettings(prev => ({ ...prev, autoMuteDuration: Math.max(1, Number(e.target.value)) }))}
                                 />
@@ -391,78 +391,78 @@ export const SettingsView: React.FC = () => {
                     </div>
 
                     {/* Escalation Rules */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="glass-panel p-6">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
+                            <div className="p-2 bg-orange-50 dark:bg-orange-500/10 rounded-lg text-orange-600 dark:text-orange-400">
                                 <AlertTriangle size={20} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-gray-800">Escalation Rules</h2>
-                                <p className="text-sm text-gray-500">Specific punishments for point thresholds.</p>
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">Escalation Rules</h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Specific punishments for point thresholds.</p>
                             </div>
                         </div>
 
                         <div className="space-y-3 mb-6">
                             {Array.isArray(escalations) && escalations.map(rule => (
-                                <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                                <div key={rule.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-colors">
                                     <div className="flex items-center gap-4">
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-gray-800">{rule.name || 'Rule'}</span>
-                                            <span className="text-sm text-gray-500">≥ {rule.threshold} pts</span>
+                                            <span className="font-bold text-gray-800 dark:text-white">{rule.name || 'Rule'}</span>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">≥ {rule.threshold} pts</span>
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                                            rule.action === 'ban' ? 'bg-red-100 text-red-700' : 
-                                            rule.action === 'kick' ? 'bg-orange-100 text-orange-700' : 
-                                            'bg-yellow-100 text-yellow-700'
+                                            rule.action === 'ban' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' : 
+                                            rule.action === 'kick' ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300' : 
+                                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300'
                                         }`}>
                                             {rule.action}
                                         </span>
                                         {rule.action === 'mute' && (
-                                            <span className="text-sm text-gray-500 font-medium">{rule.duration}m</span>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">{rule.duration}m</span>
                                         )}
                                     </div>
                                     <button 
                                         onClick={() => handleDeleteEscalation(rule.id)}
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                                     >
                                         <Trash2 size={18} />
                                     </button>
                                 </div>
                             ))}
                             {escalations.length === 0 && (
-                                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                                    <p className="text-gray-400">No custom rules defined.</p>
+                                <div className="text-center py-8 bg-gray-50 dark:bg-white/5 rounded-lg border border-dashed border-gray-200 dark:border-white/10">
+                                    <p className="text-gray-400 dark:text-gray-500">No custom rules defined.</p>
                                 </div>
                             )}
                         </div>
 
-                        <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Add New Rule</h3>
+                        <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-white/10">
+                            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">Add New Rule</h3>
                             <div className="flex flex-wrap gap-4 items-end">
                                 <div className="flex-1 min-w-[150px]">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
                                     <input 
                                         type="text" 
-                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                         value={newRuleName}
                                         onChange={e => setNewRuleName(e.target.value)}
                                         placeholder="e.g. Mute 1h"
                                     />
                                 </div>
                                 <div className="w-24">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Threshold</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Threshold</label>
                                     <input 
                                         type="number" 
-                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                         value={newRuleThreshold}
                                         onChange={e => setNewRuleThreshold(Number(e.target.value))}
                                         min="1"
                                     />
                                 </div>
                                 <div className="w-32">
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Action</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Action</label>
                                     <select 
-                                        className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                        className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                         value={newRuleAction}
                                         onChange={e => setNewRuleAction(e.target.value as any)}
                                     >
@@ -473,10 +473,10 @@ export const SettingsView: React.FC = () => {
                                 </div>
                                 {newRuleAction === 'mute' && (
                                     <div className="w-24">
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Duration (m)</label>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Duration (m)</label>
                                         <input 
                                             type="number" 
-                                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                                            className="w-full p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                             value={newRuleDuration}
                                             onChange={e => setNewRuleDuration(Number(e.target.value))}
                                             min="1"
@@ -485,7 +485,7 @@ export const SettingsView: React.FC = () => {
                                 )}
                                 <button 
                                     onClick={handleAddEscalation}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors text-sm font-medium ml-auto"
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-black dark:hover:bg-gray-200 transition-colors text-sm font-medium ml-auto"
                                 >
                                     <Plus size={16} />
                                     Add Rule
@@ -498,46 +498,46 @@ export const SettingsView: React.FC = () => {
 
             {/* Warning Presets */}
             {activeTab === 'presets' && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <h2 className="text-xl font-bold mb-6 text-gray-800">Warning Presets</h2>
+                <div className="glass-panel p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">Warning Presets</h2>
                     <div className="space-y-3 mb-6">
                         {Array.isArray(presets) && presets.map(preset => (
-                            <div key={preset.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                            <div key={preset.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-colors">
                                 <div>
-                                    <span className="font-medium text-gray-900">{preset.name}</span>
-                                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <span className="font-medium text-gray-900 dark:text-white">{preset.name}</span>
+                                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300">
                                         {preset.points} pts
                                     </span>
                                 </div>
                                 <button 
                                     onClick={() => handleDeletePreset(preset.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                                 >
                                     <Trash2 size={18} />
                                 </button>
                             </div>
                         ))}
                         {presets.length === 0 && (
-                            <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                                <p className="text-gray-400">No presets defined.</p>
+                            <div className="text-center py-8 bg-gray-50 dark:bg-white/5 rounded-lg border border-dashed border-gray-200 dark:border-white/10">
+                                <p className="text-gray-400 dark:text-gray-500">No presets defined.</p>
                             </div>
                         )}
                     </div>
                     
-                    <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                        <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Add New Preset</h3>
+                    <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-white/10">
+                        <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">Add New Preset</h3>
                         <div className="flex gap-3">
                             <input 
                                 type="text" 
                                 placeholder="Reason (e.g. Spamming)"
-                                className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
+                                className="flex-1 p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={newPresetName}
                                 onChange={e => setNewPresetName(e.target.value)}
                             />
                             <input 
                                 type="number" 
                                 placeholder="Pts"
-                                className="w-24 p-2 border border-gray-300 rounded-lg text-sm"
+                                className="w-24 p-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={newPresetPoints}
                                 onChange={e => setNewPresetPoints(Number(e.target.value))}
                                 min="1"
@@ -557,11 +557,11 @@ export const SettingsView: React.FC = () => {
 
             {/* AI Settings */}
             {activeTab === 'ai' && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <h2 className="text-xl font-bold mb-6 text-gray-800">AI Moderation Configuration</h2>
+                <div className="glass-panel p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">AI Moderation Configuration</h2>
                     
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-700 dark:bg-slate-800 rounded-lg">
                             <div>
                                 <label className="text-white font-medium">Включить AI анализ</label>
                                 <p className="text-sm text-gray-400">Автоматически проверять сообщения на токсичность</p>
@@ -577,10 +577,10 @@ export const SettingsView: React.FC = () => {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
                             <div>
-                                <label className="text-gray-800 font-medium">Пинговать нарушителя</label>
-                                <p className="text-sm text-gray-500">Упоминать пользователя при выдаче предупреждения</p>
+                                <label className="text-gray-800 dark:text-white font-medium">Пинговать нарушителя</label>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Упоминать пользователя при выдаче предупреждения</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input 
@@ -589,15 +589,15 @@ export const SettingsView: React.FC = () => {
                                     checked={settings.aiPingUser !== false} // Default true
                                     onChange={(e) => setSettings({...settings, aiPingUser: e.target.checked})}
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Single Message Prompt (Images/Direct)</label>
-                            <p className="text-xs text-gray-500 mb-2">Instructions for analyzing single messages or images. Must return simple JSON.</p>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Single Message Prompt (Images/Direct)</label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Instructions for analyzing single messages or images. Must return simple JSON.</p>
                             <textarea 
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                className="w-full p-3 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.aiPrompt}
                                 onChange={e => setSettings({...settings, aiPrompt: e.target.value})}
                                 placeholder="Enter prompt for single messages..."
@@ -605,10 +605,10 @@ export const SettingsView: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Batch Analysis Prompt (Text Monitoring)</label>
-                            <p className="text-xs text-gray-500 mb-2">Instructions for analyzing a list of messages. Must return <code>{`{ "results": [...] }`}</code> JSON.</p>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Batch Analysis Prompt (Text Monitoring)</label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Instructions for analyzing a list of messages. Must return <code>{`{ "results": [...] }`}</code> JSON.</p>
                             <textarea 
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                className="w-full p-3 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.aiBatchPrompt}
                                 onChange={e => setSettings({...settings, aiBatchPrompt: e.target.value})}
                                 placeholder="Enter prompt for batch analysis..."
@@ -616,17 +616,17 @@ export const SettingsView: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Server Rules</label>
-                            <p className="text-xs text-gray-500 mb-2">These rules will be injected into the prompt.</p>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Server Rules</label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">These rules will be injected into the prompt.</p>
                             <textarea 
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                className="w-full p-3 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.aiRules}
                                 onChange={e => setSettings({...settings, aiRules: e.target.value})}
                                 placeholder="Enter server rules..."
                             />
                         </div>
 
-                        <div className="flex justify-end pt-4 border-t border-gray-100">
+                        <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-white/5">
                             <button 
                                 onClick={handleSaveSettings}
                                 disabled={saving}
@@ -642,11 +642,11 @@ export const SettingsView: React.FC = () => {
 
             {/* Appeals Settings */}
             {activeTab === 'appeals' && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <h2 className="text-xl font-bold mb-6 text-gray-800">Appeals Configuration</h2>
+                <div className="glass-panel p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-white">Appeals Configuration</h2>
                     
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-700 dark:bg-slate-800 rounded-lg">
                             <div>
                                 <label className="text-white font-medium">Включить систему апелляций</label>
                                 <p className="text-sm text-gray-400">Разрешить пользователям подавать апелляции через AI</p>
@@ -664,9 +664,9 @@ export const SettingsView: React.FC = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Канал для апелляций</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Канал для апелляций</label>
                                 <select 
-                                    className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-gray-900 focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-white/10 rounded px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                     value={settings.appealsChannelId}
                                     onChange={(e) => setSettings({...settings, appealsChannelId: e.target.value})}
                                 >
@@ -675,36 +675,36 @@ export const SettingsView: React.FC = () => {
                                         <option key={c.value} value={c.value}>{c.label}</option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">Куда бот будет отправлять новые апелляции</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Куда бот будет отправлять новые апелляции</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Категория тикетов</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Категория тикетов</label>
                                 <select
                                     value={settings.ticketsCategoryId}
                                     onChange={(e) => setSettings({ ...settings, ticketsCategoryId: e.target.value })}
-                                    className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-gray-900 focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-white/10 rounded px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                                 >
                                     <option value="">Выберите категорию...</option>
                                     {channels.filter(c => c.label.startsWith('[Category]')).map(c => (
                                         <option key={c.value} value={c.value}>{c.label.replace('[Category] ', '')}</option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">Где создавать каналы для рассмотрения</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Где создавать каналы для рассмотрения</p>
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Appeals Filter Prompt</label>
-                            <p className="text-xs text-gray-500 mb-2">Instructions for validating appeals. Must return <code>{`{ "valid": boolean, "reason": "string" }`}</code> JSON.</p>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Appeals Filter Prompt</label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Instructions for validating appeals. Must return <code>{`{ "valid": boolean, "reason": "string" }`}</code> JSON.</p>
                             <textarea 
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48"
+                                className="w-full p-3 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm h-48 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                                 value={settings.appealsPrompt}
                                 onChange={e => setSettings({...settings, appealsPrompt: e.target.value})}
                                 placeholder="Enter appeals filter prompt..."
                             />
                         </div>
 
-                        <div className="flex justify-end pt-4 border-t border-gray-100">
+                        <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-white/5">
                             <button 
                                 onClick={handleSaveSettings}
                                 disabled={saving}
