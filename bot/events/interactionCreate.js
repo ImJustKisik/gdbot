@@ -29,6 +29,45 @@ async function handleInteraction(interaction) {
             return;
         }
 
+        if (interaction.customId === 'resend_verification_dm') {
+            try {
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                
+                const guild = interaction.client.guilds.cache.get(GUILD_ID);
+                if (!guild) {
+                    await interaction.editReply('❌ Ошибка: Основной сервер не найден.');
+                    return;
+                }
+
+                let member;
+                try {
+                    member = await guild.members.fetch(interaction.user.id);
+                } catch (e) {
+                    await interaction.editReply('❌ Ошибка: Вы не найдены на сервере.');
+                    return;
+                }
+
+                const sent = await sendVerificationDM(member);
+                if (sent) {
+                    await interaction.editReply('✅ Новая ссылка отправлена!');
+                    // Disable the button on the old message to prevent confusion
+                    try {
+                        const disabledRow = ActionRowBuilder.from(interaction.message.components[0]);
+                        disabledRow.components[0].setDisabled(true);
+                        await interaction.message.edit({ components: [disabledRow] });
+                    } catch (e) {
+                        // Ignore if message edit fails (e.g. ephemeral or too old)
+                    }
+                } else {
+                    await interaction.editReply('❌ Не удалось отправить сообщение. Проверьте настройки приватности (разрешите ЛС от участников сервера).');
+                }
+            } catch (error) {
+                console.error('Error in resend_verification_dm:', error);
+                await interaction.editReply('❌ Произошла ошибка при обработке запроса.');
+            }
+            return;
+        }
+
         if (interaction.customId === 'appeal_dismiss') {
             await interaction.update({ components: [] });
             await interaction.followUp({ content: 'Принято.', flags: MessageFlags.Ephemeral });

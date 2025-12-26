@@ -1,4 +1,4 @@
-const { EmbedBuilder, AttachmentBuilder, ChannelType } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const QRCode = require('qrcode');
 const db = require('../db');
 const { createVerificationState } = require('../verification-state');
@@ -154,7 +154,15 @@ async function generateVerificationMessage(userId) {
         .setColor('Blue')
         .setThumbnail('attachment://verification-qr.png');
 
-    return { embeds: [embed], files: [attachment] };
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('resend_verification_dm')
+                .setLabel('🔄 Получить новую ссылку')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    return { embeds: [embed], files: [attachment], components: [row] };
 }
 
 async function fetchGuildMemberSafe(guild, userId) {
