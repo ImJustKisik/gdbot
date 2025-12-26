@@ -1,5 +1,6 @@
 const { EmbedBuilder, AttachmentBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const QRCode = require('qrcode');
+// const QRCode = require('qrcode'); // Disabled due to SIGILL crashes with Canvas
+const axios = require('axios');
 const db = require('../db');
 const { createVerificationState } = require('../verification-state');
 const { CLIENT_ID, REDIRECT_URI, DEFAULT_SETTINGS, GUILD_ID } = require('./config');
@@ -138,31 +139,45 @@ async function generateVerificationMessage(userId) {
     
     const finalUrl = oauthUrl.toString();
     
-    console.log(`Generated OAuth URL for user ${userId}: ${finalUrl}`);
+    console.log(`[DEBUG] Generated OAuth URL for user ${userId}: ${finalUrl}`);
 
-    const qrCodeData = await QRCode.toDataURL(finalUrl);
-    const buffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
-    const attachment = new AttachmentBuilder(buffer, { name: 'verification-qr.png' });
+    try {
+        console.log('[DEBUG] Starting QR code generation (via API)...');
+        
+        // Use external API to generate QR code to avoid local Canvas/Native module crashes (SIGILL)
+        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalUrl)}`;
+        const response = await axios.get(qrApiUrl, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+        
+        console.log(`[DEBUG] QR code generated via API. Buffer length: ${buffer.length}`);
+        
+        const attachment = new AttachmentBuilder(buffer, { name: 'verification-qr.png' });
+        console.log('[DEBUG] AttachmentBuilder created.');
 
-    const embed = new EmbedBuilder()
-        .setTitle('Требуется верификация')
-        .setDescription(`Добро пожаловать! Для доступа к серверу необходимо пройти верификацию.
+        const embed = new EmbedBuilder()
+            .setTitle('Требуется верификация')
+            .setDescription(`Добро пожаловать! Для доступа к серверу необходимо пройти верификацию.
 
 ### [👉 НАЖМИТЕ СЮДА, ЧТОБЫ ВЕРИФИЦИРОВАТЬСЯ 👈](${finalUrl})
 
 Или отсканируйте QR-код с помощью **камеры телефона** (не используйте сканер Discord).`)
-        .setColor('Blue')
-        .setThumbnail('attachment://verification-qr.png');
+            .setColor('Blue')
+            .setThumbnail('attachment://verification-qr.png');
 
-    const row = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId('resend_verification_dm')
-                .setLabel('🔄 Получить новую ссылку')
-                .setStyle(ButtonStyle.Secondary)
-        );
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('resend_verification_dm')
+                    .setLabel('🔄 Получить новую ссылку')
+                    .setStyle(ButtonStyle.Secondary)
+            );
 
-    return { embeds: [embed], files: [attachment], components: [row] };
+        console.log('[DEBUG] Returning message payload.');
+        return { embeds: [embed], files: [attachment], components: [row] };
+    } catch (err) {
+        console.error('[DEBUG] Error generating verification message:', err);
+        throw err;
+    }
 }
 
 async function fetchGuildMemberSafe(guild, userId) {
@@ -177,8 +192,11 @@ async function fetchGuildMemberSafe(guild, userId) {
 
 async function sendVerificationDM(member) {
     try {
+        console.log(`[DEBUG] Sending verification DM to ${member.user.tag} (${member.id})...`);
         const messagePayload = await generateVerificationMessage(member.id);
+        console.log('[DEBUG] Payload generated. Sending DM...');
         await member.send(messagePayload);
+        console.log('[DEBUG] DM sent successfully.');
         return true;
     } catch (error) {
         console.log(`Could not send DM to ${member.user.tag}: ${error.message}`);

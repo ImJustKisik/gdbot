@@ -30,11 +30,14 @@ async function handleInteraction(interaction) {
         }
 
         if (interaction.customId === 'resend_verification_dm') {
+            console.log('[DEBUG] Handling resend_verification_dm interaction...');
             try {
                 await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                console.log('[DEBUG] Interaction deferred.');
                 
                 const guild = interaction.client.guilds.cache.get(GUILD_ID);
                 if (!guild) {
+                    console.error('[DEBUG] Guild not found.');
                     await interaction.editReply('❌ Ошибка: Основной сервер не найден.');
                     return;
                 }
@@ -42,12 +45,17 @@ async function handleInteraction(interaction) {
                 let member;
                 try {
                     member = await guild.members.fetch(interaction.user.id);
+                    console.log(`[DEBUG] Member fetched: ${member.user.tag}`);
                 } catch (e) {
+                    console.error('[DEBUG] Member fetch failed:', e);
                     await interaction.editReply('❌ Ошибка: Вы не найдены на сервере.');
                     return;
                 }
 
+                console.log('[DEBUG] Calling sendVerificationDM...');
                 const sent = await sendVerificationDM(member);
+                console.log(`[DEBUG] sendVerificationDM returned: ${sent}`);
+                
                 if (sent) {
                     await interaction.editReply('✅ Новая ссылка отправлена!');
                     // Disable the button on the old message to prevent confusion
