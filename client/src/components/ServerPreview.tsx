@@ -85,27 +85,11 @@ export const ServerPreview: React.FC = () => {
 
   if (!guild) return <div>Failed to load server preview</div>;
 
-  // Get categories from the channel list (we need to find the category names)
-  // The API I wrote returns channels flat. I should have returned categories separately or included category info.
-  // Wait, I did return `categories` in the API response but the interface `DiscordGuild` only has `channels`.
-  // Let's fix the interface or just work with what we have.
-  // The API returns `channels` (non-categories) and `categories` (categories).
-  // But my interface `DiscordGuild` only defined `channels`.
-  // I'll assume `channels` contains everything for now or I need to update the interface.
-  // Actually, looking at my API code:
-  // res.json({ ..., channels, categories });
-  // So I should update the interface. But for now let's just use `channels` and filter.
-  
-  // Wait, the API code:
-  // const channels = guild.channels.cache.filter(c => c.type !== 4)...
-  // const categories = guild.channels.cache.filter(c => c.type === 4)...
-  // So `channels` in the response ONLY has non-categories.
-  // And `categories` is a separate field.
-  // I need to update `DiscordGuild` interface in `client/src/api/discord.ts` to include `categories`.
-  // But I can't edit that file right now without another tool call.
-  // Let's just cast `guild` to `any` for the categories for a moment or assume they are there.
+  // Extract categories from the channels list
+  const categories = guild.channels
+    .filter(c => c.type === 4)
+    .sort((a, b) => a.position - b.position);
 
-  const categories = (guild as any).categories as { id: string, name: string, position: number }[];
   const channelsByParent = groupChannels(guild.channels);
 
   return (
